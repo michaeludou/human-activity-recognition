@@ -6,12 +6,39 @@ from tensorflow.keras.layers import SimpleRNN, Dense, Dropout
 import pandas as pd
 import os
 import logging
+import sys
+import gc
+import time
+from functools import wraps
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stdout
+)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+
+# Set timeout for model operations (in seconds)
+MODEL_TIMEOUT = 30
+
+def timeout_handler(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        elapsed_time = time.time() - start_time
+        
+        if elapsed_time > MODEL_TIMEOUT:
+            logger.warning(f"Operation {func.__name__} took {elapsed_time:.2f}s (exceeded timeout of {MODEL_TIMEOUT}s)")
+            # Force garbage collection
+            gc.collect()
+            tf.keras.backend.clear_session()
+        
+        return result
+    return wrapper
 
 # Define activities
 ACTIVITIES = ['Walking', 'Running', 'Sitting', 'Standing', 'Laying']
@@ -55,53 +82,100 @@ SAMPLE_TRAINING_DATA = {
     ]
 }
 
+@timeout_handler
 def create_model():
     """Create and compile the RNN model"""
-    model = Sequential([
-        SimpleRNN(64, input_shape=(5, 3), return_sequences=True),
-        Dropout(0.2),
-        SimpleRNN(32),
-        Dropout(0.2),
-        Dense(16, activation='relu'),
-        Dense(len(ACTIVITIES), activation='softmax')
-    ])
-    
-    model.compile(
-        optimizer='adam',
-        loss='categorical_crossentropy',
-        metrics=['accuracy']
-    )
-    
-    return model
+    try:
+        logger.info("Creating new model...")
+        model = Sequential([
+            SimpleRNN(64, input_shape=(5, 3), return_sequences=True),
+            Dropout(0.2),
+            SimpleRNN(32),
+            Dropout(0.2),
+            Dense(16, activation='relu'),
+            Dense(len(ACTIVITIES), activation='softmax')
+        ])
+        
+        model.compile(
+            optimizer='adam',
+            loss='categorical_crossentropy',
+            metrics=['accuracy']
+        )
+        logger.info("Model created successfully")
+        return model
+    except Exception as e:
+        logger.error(f"Error creating model: {str(e)}")
+        raise
 
+@timeout_handler
 def create_training_data():
     """Create training data from sample patterns"""
-    X = []
-    y = []
-    
-    for activity_idx, (activity, base_data) in enumerate(SAMPLE_TRAINING_DATA.items()):
-        # Use base data
-        X.append(base_data)
-        y.append(activity_idx)
+    try:
+        logger.info("Creating training data...")
+        X = []
+        y = []
         
-        # Add variations with controlled noise
-        for _ in range(30):  # Increased variations
-            variation = np.array(base_data) + np.random.normal(
-                0, 
-                0.1 if activity in ['Sitting', 'Standing', 'Laying'] else 0.3,  # Less noise for stationary activities
-                size=np.array(base_data).shape
-            )
-            X.append(variation)
+        for activity_idx, (activity, base_data) in enumerate(SAMPLE_TRAINING_DATA.items()):
+            # Use base data
+            X.append(base_data)
             y.append(activity_idx)
-    
-    X = np.array(X)
-    y = np.array(y)
-    
-    # Convert labels to one-hot encoding
-    y_one_hot = tf.keras.utils.to_categorical(y, num_classes=len(ACTIVITIES))
-    
-    return X, y_one_hot
+            
+            # Add variations with controlled noise
+            for _ in range(30):  # Increased variations
+                variation = np.array(base_data) + np.random.normal(
+                    0, 
+                    0.1 if activity in ['Sitting', 'Standing', 'Laying'] else 0.3,  # Less noise for stationary activities
+                    size=np.array(base_data).shape
+                )
+                X.append(variation)
+                y.append(activity_idx)
+        
+        X = np.array(X)
+        y = np.array(y)
+        
+        # Convert labels to one-hot encoding
+        y_one_hot = tf.keras.utils.to_categorical(y, num_classes=len(ACTIVITIES))
+        logger.info(f"Training data created: X shape {X.shape}, y shape {y_one_hot.shape}")
+        return X, y_one_hot
+    except Exception as e:
+        logger.error(f"Error creating training data: {str(e)}")
+        raise
 
+# Initialize model globally
+model = None
+
+@timeout_handler
+def initialize_model():
+    """Initialize or load the model"""
+    global model
+    try:
+        model_path = os.path.join(os.path.dirname(__file__), 'har_rnn_model.h5')
+        logger.info(f"Attempting to load model from {model_path}")
+        
+        if os.path.exists(model_path):
+            logger.info("Loading existing model...")
+            model = load_model(model_path)
+            logger.info("Model loaded successfully")
+        else:
+            logger.info("Model file not found, creating new model")
+            X, y = create_training_data()
+            model = create_model()
+            model.fit(X, y, epochs=50, batch_size=32, verbose=1)
+            
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(model_path), exist_ok=True)
+            model.save(model_path)
+            logger.info(f"Created and saved new model to {model_path}")
+        
+        return True
+    except Exception as e:
+        logger.error(f"Error initializing model: {str(e)}")
+        return False
+
+# Initialize model when app starts
+initialize_model()
+
+@timeout_handler
 def analyze_sequence(data):
     """Analyze a sequence of sensor readings to determine activity patterns"""
     # Convert to numpy array
@@ -169,6 +243,7 @@ def analyze_sequence(data):
     
     return pattern_scores, metrics
 
+@timeout_handler
 def preprocess_input_data(data):
     """Preprocess input data for prediction"""
     data = np.array(data)
@@ -189,19 +264,6 @@ def preprocess_input_data(data):
     
     return data
 
-# Initialize model
-model_path = os.path.join(os.path.dirname(__file__), 'har_rnn_model.h5')
-try:
-    model = load_model(model_path)
-    logger.info("Loaded existing model")
-except (OSError, IOError):
-    logger.info("Model file not found, creating new model")
-    X, y = create_training_data()
-    model = create_model()
-    model.fit(X, y, epochs=50, batch_size=32, verbose=0)
-    model.save(model_path)
-    logger.info("Created and saved new model")
-
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -209,33 +271,59 @@ def index():
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
+        # Check if model is initialized
+        global model
+        if model is None:
+            logger.error("Model not initialized")
+            if not initialize_model():
+                return jsonify({'error': 'Model initialization failed'}), 500
+        
         # Get data from request
         data = request.json
-        logger.debug(f"Received request data: {data}")
+        logger.info(f"Received request data: {data}")
         
+        if not data:
+            logger.error("No data received in request")
+            return jsonify({'error': 'No data provided in request'}), 400
+            
         sensor_data = data.get('sensor_data', [])
-        logger.debug(f"Extracted sensor data: {sensor_data}")
+        logger.info(f"Processing sensor data of length: {len(sensor_data)}")
         
         if not sensor_data:
+            logger.error("No sensor data provided")
             return jsonify({'error': 'No sensor data provided'}), 400
+            
+        try:
+            # Analyze patterns in the data
+            pattern_scores, metrics = analyze_sequence(sensor_data)
+            logger.info(f"Pattern analysis completed: {pattern_scores}")
+        except Exception as e:
+            logger.error(f"Error in pattern analysis: {str(e)}", exc_info=True)
+            return jsonify({'error': f'Error in pattern analysis: {str(e)}'}), 500
+            
+        try:
+            # Preprocess the data into windows
+            processed_windows = preprocess_input_data(sensor_data)
+            logger.info(f"Preprocessed data shape: {processed_windows.shape}")
+        except Exception as e:
+            logger.error(f"Error in data preprocessing: {str(e)}", exc_info=True)
+            return jsonify({'error': f'Error in data preprocessing: {str(e)}'}), 500
         
-        # Analyze patterns in the data
-        pattern_scores, metrics = analyze_sequence(sensor_data)
-        
-        # Preprocess the data into windows
-        processed_windows = preprocess_input_data(sensor_data)
-        
-        # Make predictions for each window
-        predictions = []
-        for window in processed_windows:
-            window_reshaped = window.reshape(1, *window.shape)
-            pred = model.predict(window_reshaped, verbose=0)
-            predictions.append(pred[0])
-        
-        # Average the predictions
-        avg_prediction = np.mean(predictions, axis=0)
-        predicted_class = np.argmax(avg_prediction)
-        base_confidence = float(avg_prediction[predicted_class])
+        try:
+            # Make predictions for each window
+            predictions = []
+            for window in processed_windows:
+                window_reshaped = window.reshape(1, *window.shape)
+                pred = model.predict(window_reshaped, verbose=0)
+                predictions.append(pred[0])
+            
+            # Average the predictions
+            avg_prediction = np.mean(predictions, axis=0)
+            predicted_class = np.argmax(avg_prediction)
+            base_confidence = float(avg_prediction[predicted_class])
+        except Exception as e:
+            logger.error(f"Error in model prediction: {str(e)}", exc_info=True)
+            return jsonify({'error': f'Error in model prediction: {str(e)}'}), 500
         
         # Calculate final confidence using both model prediction and pattern analysis
         predicted_activity = ACTIVITIES[predicted_class]
@@ -277,10 +365,14 @@ def predict():
         }
         logger.info(f"Prediction result: {result}")
         
+        # Force garbage collection after prediction
+        gc.collect()
+        tf.keras.backend.clear_session()
+        
         return jsonify(result)
         
     except Exception as e:
-        logger.error(f"Prediction error: {str(e)}", exc_info=True)
+        logger.error(f"Error in prediction: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
