@@ -84,12 +84,11 @@ SAMPLE_TRAINING_DATA = {
 
 @timeout_handler
 def create_model():
-    """Create and compile an ultra-lightweight RNN model"""
+    """Create and compile a minimal RNN model"""
     try:
-        logger.info("Creating new ultra-lightweight model...")
+        logger.info("Creating new minimal model...")
         model = Sequential([
-            SimpleRNN(8, input_shape=(5, 3), return_sequences=True),
-            SimpleRNN(4),
+            SimpleRNN(4, input_shape=(5, 3)),
             Dense(4, activation='relu'),
             Dense(len(ACTIVITIES), activation='softmax')
         ])
@@ -99,7 +98,7 @@ def create_model():
             loss='categorical_crossentropy',
             metrics=['accuracy']
         )
-        logger.info("Ultra-lightweight model created successfully")
+        logger.info("Minimal model created successfully")
         return model
     except Exception as e:
         logger.error(f"Error creating model: {str(e)}")
@@ -118,8 +117,8 @@ def create_training_data():
             X.append(base_data)
             y.append(activity_idx)
             
-            # Add minimal variations with controlled noise
-            for _ in range(10):  # Further reduced variations
+            # Add minimal variations
+            for _ in range(5):  # Very minimal variations
                 variation = np.array(base_data) + np.random.normal(
                     0, 
                     0.1 if activity in ['Sitting', 'Standing', 'Laying'] else 0.3,
@@ -159,7 +158,7 @@ def initialize_model():
             X, y = create_training_data()
             model = create_model()
             # Minimal training for faster initialization
-            model.fit(X, y, epochs=10, batch_size=8, verbose=1)
+            model.fit(X, y, epochs=5, batch_size=4, verbose=1)
             
             # Ensure directory exists
             os.makedirs(os.path.dirname(model_path), exist_ok=True)
@@ -269,110 +268,69 @@ def index():
 
 @app.route('/predict', methods=['POST'])
 def predict():
+    """Handle prediction requests with optimized processing"""
     try:
-        # Check if model is initialized
-        global model
-        if model is None:
-            logger.error("Model not initialized")
-            if not initialize_model():
-                return jsonify({'error': 'Model initialization failed'}), 500
-        
-        # Get data from request
-        data = request.json
-        logger.info(f"Received request data: {data}")
-        
-        if not data:
-            logger.error("No data received in request")
-            return jsonify({'error': 'No data provided in request'}), 400
-            
-        sensor_data = data.get('sensor_data', [])
-        logger.info(f"Processing sensor data of length: {len(sensor_data)}")
-        
-        if not sensor_data:
-            logger.error("No sensor data provided")
+        data = request.get_json()
+        if not data or 'sensor_data' not in data:
+            logger.error("Invalid request: No sensor data provided")
             return jsonify({'error': 'No sensor data provided'}), 400
-            
+
+        sensor_data = data['sensor_data']
+        logger.info(f"Received sensor data with {len(sensor_data)} samples")
+
+        # Preprocess data with minimal operations
+        preprocessed_data = np.array(sensor_data).reshape(1, 5, 3)
+        logger.info(f"Preprocessed data shape: {preprocessed_data.shape}")
+
+        # Quick pattern analysis before prediction
+        pattern_analysis = analyze_sequence(sensor_data)
+        logger.info(f"Pattern analysis completed: {pattern_analysis}")
+
+        # Make prediction with timeout handling
         try:
-            # Analyze patterns in the data
-            pattern_scores, metrics = analyze_sequence(sensor_data)
-            logger.info(f"Pattern analysis completed: {pattern_scores}")
+            with timeout(10):  # Reduced timeout to 10 seconds
+                prediction = model.predict(preprocessed_data, verbose=0)[0]
+                logger.info(f"Raw prediction: {prediction}")
+                
+                # Clean up memory after prediction
+                cleanup_memory()
+                
+                # Process results
+                result = {
+                    'prediction': ACTIVITIES[np.argmax(prediction)],
+                    'confidence': float(np.max(prediction)),
+                    'probabilities': {
+                        activity: float(prob) 
+                        for activity, prob in zip(ACTIVITIES, prediction)
+                    },
+                    'pattern_analysis': pattern_analysis
+                }
+                
+                logger.info(f"Final prediction: {result['prediction']} with confidence {result['confidence']}")
+                return jsonify(result)
+        except TimeoutError:
+            logger.error("Prediction timed out")
+            cleanup_memory()
+            return jsonify({'error': 'Prediction timed out. Please try again.'}), 504
         except Exception as e:
-            logger.error(f"Error in pattern analysis: {str(e)}", exc_info=True)
-            return jsonify({'error': f'Error in pattern analysis: {str(e)}'}), 500
-            
-        try:
-            # Preprocess the data into windows
-            processed_windows = preprocess_input_data(sensor_data)
-            logger.info(f"Preprocessed data shape: {processed_windows.shape}")
-        except Exception as e:
-            logger.error(f"Error in data preprocessing: {str(e)}", exc_info=True)
-            return jsonify({'error': f'Error in data preprocessing: {str(e)}'}), 500
-        
-        try:
-            # Make predictions for each window
-            predictions = []
-            for window in processed_windows:
-                window_reshaped = window.reshape(1, *window.shape)
-                pred = model.predict(window_reshaped, verbose=0)
-                predictions.append(pred[0])
-            
-            # Average the predictions
-            avg_prediction = np.mean(predictions, axis=0)
-            predicted_class = np.argmax(avg_prediction)
-            base_confidence = float(avg_prediction[predicted_class])
-        except Exception as e:
-            logger.error(f"Error in model prediction: {str(e)}", exc_info=True)
-            return jsonify({'error': f'Error in model prediction: {str(e)}'}), 500
-        
-        # Calculate final confidence using both model prediction and pattern analysis
-        predicted_activity = ACTIVITIES[predicted_class]
-        pattern_confidence = pattern_scores[predicted_activity]
-        
-        # Weighted average of model confidence and pattern confidence
-        final_confidence = (base_confidence * 0.6 + pattern_confidence * 0.4)
-        
-        # Adjust confidence based on number of samples
-        if len(sensor_data) < 5:
-            final_confidence *= 0.8  # Reduce confidence for very few samples
-        
-        # Add uncertainty for very similar activities
-        if predicted_activity in ['Sitting', 'Standing']:
-            # Check if the other stationary activity has similar confidence
-            other_activity = 'Standing' if predicted_activity == 'Sitting' else 'Sitting'
-            other_idx = ACTIVITIES.index(other_activity)
-            other_confidence = float(avg_prediction[other_idx])
-            
-            if abs(other_confidence - base_confidence) < 0.2:
-                final_confidence *= 0.8  # Reduce confidence when activities are ambiguous
-        
-        # Calculate confidence for all activities
-        all_confidences = {}
-        for i, activity in enumerate(ACTIVITIES):
-            all_confidences[activity] = {
-                'model_confidence': float(avg_prediction[i]),
-                'pattern_score': pattern_scores[activity],
-                'final_confidence': float(avg_prediction[i]) * 0.6 + pattern_scores[activity] * 0.4
-            }
-        
-        result = {
-            'activity': predicted_activity,
-            'confidence': min(0.99, final_confidence),  # Cap at 99% to acknowledge uncertainty
-            'num_samples': len(sensor_data),
-            'pattern_score': pattern_confidence,
-            'metrics': metrics,
-            'all_confidences': all_confidences
-        }
-        logger.info(f"Prediction result: {result}")
-        
-        # Force garbage collection after prediction
+            logger.error(f"Error during prediction: {str(e)}")
+            cleanup_memory()
+            return jsonify({'error': str(e)}), 500
+
+    except Exception as e:
+        logger.error(f"Error processing request: {str(e)}")
+        cleanup_memory()
+        return jsonify({'error': str(e)}), 500
+
+def cleanup_memory():
+    """Clean up memory to prevent leaks"""
+    try:
+        import gc
         gc.collect()
         tf.keras.backend.clear_session()
-        
-        return jsonify(result)
-        
+        logger.info("Memory cleanup completed")
     except Exception as e:
-        logger.error(f"Error in prediction: {str(e)}", exc_info=True)
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error during memory cleanup: {str(e)}")
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
