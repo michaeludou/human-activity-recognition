@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Human Activity Recognition</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding-top: 2rem;
+        }
+        .card {
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .result-card {
+            display: none;
+        }
+        .sensor-input {
+            margin-bottom: 1rem;
+            padding: 10px;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+        }
+        .btn-primary {
+            background-color: #0d6efd;
+            border: none;
+            padding: 10px 20px;
+        }
+        .btn-primary:hover {
+            background-color: #0b5ed7;
+        }
+        .sample-data-btn {
+            margin: 5px;
+        }
+        .activity-info {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+        }
+        .instructions {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+        .instruction-section {
+            margin-bottom: 20px;
+        }
+        .instruction-section h4 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .instruction-section ul {
+            margin-left: 20px;
+        }
+        .instruction-section li {
+            margin-bottom: 5px;
+        }
+        .activity-description {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #e8f4f8;
+            border-radius: 8px;
+            border: 1px solid #b8d8e8;
+        }
+        .activity-description h3 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .activity-description ul {
+            margin-left: 20px;
+        }
+        .activity-description li {
+            margin-bottom: 5px;
+        }
+        .confidence-bar {
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .confidence-fill {
+            height: 100%;
+            background-color: #0d6efd;
+            transition: width 0.3s ease;
+        }
+        .confidence-table th {
+            background-color: #f8f9fa;
+        }
+        .confidence-table td {
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-body">
+                        <h2 class="card-title text-center mb-4">Human Activity Recognition</h2>
+                        
+                        <div class="mb-4">
+                            <h5>Enter Sensor Data</h5>
+                            <p class="text-muted">Enter x, y, z coordinates from your sensor data or use sample data:</p>
+                            
+                            <!-- Sample Data Buttons -->
+                            <div class="mb-3">
+                                <h6>Sample Activities:</h6>
+                                <button class="btn btn-outline-primary sample-data-btn" onclick="loadSampleData('walking')">Walking</button>
+                                <button class="btn btn-outline-primary sample-data-btn" onclick="loadSampleData('running')">Running</button>
+                                <button class="btn btn-outline-primary sample-data-btn" onclick="loadSampleData('sitting')">Sitting</button>
+                                <button class="btn btn-outline-primary sample-data-btn" onclick="loadSampleData('standing')">Standing</button>
+                                <button class="btn btn-outline-primary sample-data-btn" onclick="loadSampleData('laying')">Laying</button>
+                            </div>
+                            
+                            <form id="sensor-form" onsubmit="return false;">
+                                <div id="sensor-inputs">
+                                    <div class="sensor-input row">
+                                        <div class="col">
+                                            <input type="number" class="form-control x-axis" placeholder="X-axis" step="0.01" required>
+                                        </div>
+                                        <div class="col">
+                                            <input type="number" class="form-control y-axis" placeholder="Y-axis" step="0.01" required>
+                                        </div>
+                                        <div class="col">
+                                            <input type="number" class="form-control z-axis" placeholder="Z-axis" step="0.01" required>
+                                        </div>
+                                        <div class="col-auto">
+                                            <button type="button" class="btn btn-danger" onclick="removeSensorInput(this)">Remove</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </form>
+                            
+                            <button class="btn btn-secondary mt-2" onclick="addSensorInput()">Add More Data Points</button>
+                        </div>
+
+                        <div class="text-center">
+                            <button class="btn btn-primary" onclick="predictActivity()">Predict Activity</button>
+                        </div>
+
+                        <div class="result-card card mt-4">
+                            <div class="card-body">
+                                <h4 class="card-title">Prediction Result</h4>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p>Activity: <span id="predicted-activity" class="fw-bold"></span></p>
+                                        <p>Confidence: <span id="confidence" class="fw-bold"></span></p>
+                                        <p>Pattern Score: <span id="pattern-score" class="fw-bold"></span></p>
+                                        <p>Number of Samples: <span id="num-samples" class="fw-bold"></span></p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h5>Sensor Metrics</h5>
+                                        <div id="sensor-metrics">
+                                            <p>Movement Intensity: <span id="movement-intensity"></span></p>
+                                            <p>Total Variation: <span id="total-variation"></span></p>
+                                            <p>Gravity Vector: <span id="gravity-vector"></span></p>
+                                            <p>Standard Deviation: <span id="std-deviation"></span></p>
+                                            <p>Range: <span id="range"></span></p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-4">
+                                    <h5>Confidence Breakdown</h5>
+                                    <div id="confidence-breakdown" class="table-responsive">
+                                        <table class="table table-sm">
+                                            <thead>
+                                                <tr>
+                                                    <th>Activity</th>
+                                                    <th>Model Confidence</th>
+                                                    <th>Pattern Score</th>
+                                                    <th>Final Confidence</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="confidence-table-body">
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="activity-info">
+                            <h5>About the Activities:</h5>
+                            <ul>
+                                <li><strong>Walking:</strong> Regular walking motion with moderate acceleration</li>
+                                <li><strong>Running:</strong> Faster motion with higher acceleration values</li>
+                                <li><strong>Sitting:</strong> Stationary position with minimal movement</li>
+                                <li><strong>Standing:</strong> Upright position with very little movement</li>
+                                <li><strong>Laying:</strong> Horizontal position with minimal movement</li>
+                            </ul>
+                        </div>
+
+                        <div class="activity-description">
+                            <h3>Activity Descriptions</h3>
+                            <p>Each activity has specific accelerometer patterns:</p>
+                            <ul>
+                                <li><strong>Walking:</strong> Moderate acceleration variations (0.8-5.0 m/s²) with significant Y-axis movement</li>
+                                <li><strong>Running:</strong> High acceleration variations (>3.0 m/s²) with large Y-axis movement</li>
+                                <li><strong>Sitting:</strong> Low movement (<0.4 m/s²) with forward tilt (1.0-2.0 m/s²)</li>
+                                <li><strong>Standing:</strong> Very low movement (<0.3 m/s²) with minimal tilt</li>
+                                <li><strong>Laying:</strong> Low movement with strong Y-axis gravity and minimal Z-axis gravity</li>
+                            </ul>
+                        </div>
+
+                        <div class="instructions">
+                            <h3>How to Use</h3>
+                            <div class="instruction-section">
+                                <h4>Default Values</h4>
+                                <p>The sample buttons load pre-defined accelerometer patterns:</p>
+                                <ul>
+                                    <li><strong>Walking Sample:</strong> Moderate variations [0.69, 10.8, -2.03] to [0.75, 9.12, -1.8]</li>
+                                    <li><strong>Running Sample:</strong> High variations [2.15, 15.2, -3.45] to [2.85, 15.0, -3.0]</li>
+                                    <li><strong>Sitting Sample:</strong> Low movement with forward tilt [0.12, 1.5, 9.65] to [0.12, 1.4, 9.65]</li>
+                                    <li><strong>Standing Sample:</strong> Minimal movement [0.15, 0.20, 9.81] to [0.14, 0.20, 9.81]</li>
+                                    <li><strong>Laying Sample:</strong> Horizontal position [0.05, 9.81, 0.08] to [0.05, 9.81, 0.07]</li>
+                                </ul>
+                            </div>
+
+                            <div class="instruction-section">
+                                <h4>Adding Data Points</h4>
+                                <p>When you add more data points:</p>
+                                <ul>
+                                    <li>Each new point should follow the pattern of the activity</li>
+                                    <li>For stationary activities (Sitting/Standing/Laying), keep variations small (<0.3 m/s²)</li>
+                                    <li>For dynamic activities (Walking/Running), maintain consistent movement patterns</li>
+                                    <li>The confidence score considers both the model prediction and pattern matching</li>
+                                </ul>
+                            </div>
+
+                            <div class="instruction-section">
+                                <h4>Confidence Score</h4>
+                                <p>The confidence score is calculated based on:</p>
+                                <ul>
+                                    <li>Model prediction (60% weight)</li>
+                                    <li>Pattern matching (40% weight)</li>
+                                    <li>Number of data points (reduced confidence for <5 points)</li>
+                                    <li>Similarity to other activities (reduced for ambiguous cases)</li>
+                                </ul>
+                                <p>Note: Confidence is capped at 99% to acknowledge inherent uncertainty</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Sample data for different activities
+        const sampleData = {
+            walking: [
+                [0.69, 10.8, -2.03],
+                [6.85, 7.44, -0.5],
+                [0.93, 5.63, -0.5],
+                [1.25, 8.45, -1.2],
+                [0.75, 9.12, -1.8]
+            ],
+            running: [
+                [2.15, 15.2, -3.45],
+                [8.75, 12.3, -2.1],
+                [3.25, 14.8, -2.8],
+                [4.12, 13.5, -3.2],
+                [2.85, 15.0, -3.0]
+            ],
+            sitting: [
+                [0.12, 0.15, 9.81],
+                [0.10, 0.12, 9.80],
+                [0.11, 0.14, 9.82],
+                [0.13, 0.16, 9.81],
+                [0.12, 0.15, 9.80]
+            ],
+            standing: [
+                [0.15, 0.20, 9.81],
+                [0.14, 0.18, 9.82],
+                [0.16, 0.19, 9.81],
+                [0.15, 0.21, 9.80],
+                [0.14, 0.20, 9.81]
+            ],
+            laying: [
+                [0.05, 0.08, 9.81],
+                [0.06, 0.07, 9.82],
+                [0.05, 0.09, 9.81],
+                [0.06, 0.08, 9.80],
+                [0.05, 0.07, 9.81]
+            ]
+        };
+
+        function loadSampleData(activity) {
+            // Clear existing inputs
+            document.getElementById('sensor-inputs').innerHTML = '';
+            
+            // Add sample data points
+            sampleData[activity].forEach(point => {
+                const newRow = createSensorInputRow();
+                document.getElementById('sensor-inputs').appendChild(newRow);
+                
+                const inputs = newRow.querySelectorAll('input');
+                inputs[0].value = point[0];
+                inputs[1].value = point[1];
+                inputs[2].value = point[2];
+            });
+        }
+
+        function createSensorInputRow() {
+            const div = document.createElement('div');
+            div.className = 'sensor-input row';
+            div.innerHTML = `
+                <div class="col">
+                    <input type="number" class="form-control x-axis" placeholder="X-axis" step="0.01" required>
+                </div>
+                <div class="col">
+                    <input type="number" class="form-control y-axis" placeholder="Y-axis" step="0.01" required>
+                </div>
+                <div class="col">
+                    <input type="number" class="form-control z-axis" placeholder="Z-axis" step="0.01" required>
+                </div>
+                <div class="col-auto">
+                    <button type="button" class="btn btn-danger" onclick="removeSensorInput(this)">Remove</button>
+                </div>
+            `;
+            return div;
+        }
+
+        function addSensorInput() {
+            const newRow = createSensorInputRow();
+            document.getElementById('sensor-inputs').appendChild(newRow);
+        }
+
+        function removeSensorInput(button) {
+            const sensorInputs = document.querySelectorAll('.sensor-input');
+            if (sensorInputs.length > 1) {
+                button.closest('.sensor-input').remove();
+            } else {
+                alert('You must keep at least one data point');
+            }
+        }
+
+        function validateInputs() {
+            let isValid = true;
+            document.querySelectorAll('.sensor-input').forEach(input => {
+                const x = input.querySelector('.x-axis').value;
+                const y = input.querySelector('.y-axis').value;
+                const z = input.querySelector('.z-axis').value;
+                
+                if (!x || !y || !z) {
+                    isValid = false;
+                }
+            });
+            return isValid;
+        }
+
+        function formatMetric(value) {
+            return value.map(v => v.toFixed(2)).join(', ');
+        }
+
+        function updateConfidenceTable(confidences) {
+            const tbody = document.getElementById('confidence-table-body');
+            tbody.innerHTML = '';
+            
+            Object.entries(confidences).forEach(([activity, scores]) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${activity}</td>
+                    <td>${(scores.model_confidence * 100).toFixed(2)}%</td>
+                    <td>${(scores.pattern_score * 100).toFixed(2)}%</td>
+                    <td>${(scores.final_confidence * 100).toFixed(2)}%</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function predictActivity() {
+            if (!validateInputs()) {
+                alert('Please fill in all sensor values');
+                return;
+            }
+
+            const sensorInputs = document.querySelectorAll('.sensor-input');
+            const sensorData = [];
+
+            sensorInputs.forEach(input => {
+                const x = parseFloat(input.querySelector('.x-axis').value);
+                const y = parseFloat(input.querySelector('.y-axis').value);
+                const z = parseFloat(input.querySelector('.z-axis').value);
+
+                if (!isNaN(x) && !isNaN(y) && !isNaN(z)) {
+                    sensorData.push([x, y, z]);
+                }
+            });
+
+            if (sensorData.length === 0) {
+                alert('Please enter at least one valid sensor reading');
+                return;
+            }
+
+            // Hide previous result while loading
+            document.querySelector('.result-card').style.display = 'none';
+
+            fetch('/predict', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    sensor_data: sensorData
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+
+                // Update main prediction
+                document.getElementById('predicted-activity').textContent = data.activity;
+                document.getElementById('confidence').textContent = (data.confidence * 100).toFixed(2) + '%';
+                document.getElementById('pattern-score').textContent = (data.pattern_score * 100).toFixed(2) + '%';
+                document.getElementById('num-samples').textContent = data.num_samples;
+
+                // Update metrics
+                document.getElementById('movement-intensity').textContent = formatMetric(data.metrics.movement_intensity);
+                document.getElementById('total-variation').textContent = formatMetric(data.metrics.total_variation);
+                document.getElementById('gravity-vector').textContent = formatMetric(data.metrics.gravity_vector);
+                document.getElementById('std-deviation').textContent = formatMetric(data.metrics.std_deviation);
+                document.getElementById('range').textContent = formatMetric(data.metrics.range);
+
+                // Update confidence breakdown
+                updateConfidenceTable(data.all_confidences);
+
+                // Show result card
+                document.querySelector('.result-card').style.display = 'block';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while making the prediction');
+            });
+        }
+    </script>
+</body>
+</html> 
