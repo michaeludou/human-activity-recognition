@@ -412,11 +412,20 @@
                     sensor_data: sensorData
                 })
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    if (response.status === 502) {
+                        throw new Error('Server is temporarily unavailable. Please try again in a few moments.');
+                    }
+                    return response.json().then(err => {
+                        throw new Error(err.error || 'An error occurred while making the prediction');
+                    });
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.error) {
-                    alert(data.error);
-                    return;
+                    throw new Error(data.error);
                 }
 
                 // Update main prediction
@@ -440,7 +449,8 @@
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('An error occurred while making the prediction');
+                alert(error.message || 'An error occurred while making the prediction. Please try again.');
+                document.querySelector('.result-card').style.display = 'none';
             });
         }
     </script>
