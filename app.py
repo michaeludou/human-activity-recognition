@@ -27,17 +27,11 @@ MODEL_TIMEOUT = 30
 def timeout_handler(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        start_time = time.time()
-        result = func(*args, **kwargs)
-        elapsed_time = time.time() - start_time
-        
-        if elapsed_time > MODEL_TIMEOUT:
-            logger.warning(f"Operation {func.__name__} took {elapsed_time:.2f}s (exceeded timeout of {MODEL_TIMEOUT}s)")
-            # Force garbage collection
-            gc.collect()
-            tf.keras.backend.clear_session()
-        
-        return result
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            logger.error(f"Error in {func.__name__}: {str(e)}")
+            raise
     return wrapper
 
 # Define activities
@@ -82,7 +76,18 @@ SAMPLE_TRAINING_DATA = {
     ]
 }
 
-@timeout_handler
+# Global model variable
+model = None
+
+def cleanup_memory():
+    """Clean up memory to prevent leaks"""
+    try:
+        gc.collect()
+        tf.keras.backend.clear_session()
+        logger.info("Memory cleanup completed")
+    except Exception as e:
+        logger.error(f"Error during memory cleanup: {str(e)}")
+
 def create_model():
     """Create and compile a minimal RNN model"""
     try:
@@ -104,7 +109,6 @@ def create_model():
         logger.error(f"Error creating model: {str(e)}")
         raise
 
-@timeout_handler
 def create_training_data():
     """Create minimal training data from sample patterns"""
     try:
@@ -138,9 +142,6 @@ def create_training_data():
         logger.error(f"Error creating training data: {str(e)}")
         raise
 
-# Initialize model globally
-model = None
-
 @timeout_handler
 def initialize_model():
     """Initialize or load the model"""
@@ -170,98 +171,6 @@ def initialize_model():
         logger.error(f"Error initializing model: {str(e)}")
         return False
 
-# Initialize model when app starts
-initialize_model()
-
-@timeout_handler
-def analyze_sequence(data):
-    """Analyze a sequence of sensor readings to determine activity patterns"""
-    # Convert to numpy array
-    data = np.array(data)
-    
-    # Calculate basic statistics
-    mean = np.mean(data, axis=0)
-    std = np.std(data, axis=0)
-    max_vals = np.max(data, axis=0)
-    min_vals = np.min(data, axis=0)
-    range_vals = max_vals - min_vals
-    
-    # Calculate additional features
-    gravity_vector = np.mean(data, axis=0)
-    movement_intensity = np.mean(np.abs(data), axis=0)
-    total_variation = np.sum(np.abs(np.diff(data, axis=0)), axis=0)
-    
-    # Calculate pattern match scores (0 to 1) instead of binary matches
-    pattern_scores = {
-        'Walking': (
-            min(1.0, max(0.0, (
-                (np.mean(std) > 0.8 and np.mean(std) < 5.0) * 0.4 +  # Moderate variation
-                (np.any((mean > 0.5) & (mean < 10.0))) * 0.3 +      # Reasonable mean values
-                (range_vals[1] > 2.0) * 0.3                         # Y-axis movement
-            )))
-        ),
-        'Running': (
-            min(1.0, max(0.0, (
-                (np.mean(std) > 3.0) * 0.4 +                        # High variation
-                (np.any(np.abs(data) > 10.0)) * 0.3 +              # High acceleration
-                (range_vals[1] > 4.0) * 0.3                         # Large Y-axis movement
-            )))
-        ),
-        'Sitting': (
-            min(1.0, max(0.0, (
-                (np.all(std < 0.4)) * 0.3 +                         # Low movement
-                (abs(gravity_vector[2]) > 9.3) * 0.3 +              # Strong Z-axis gravity
-                (1.0 < abs(gravity_vector[1]) < 2.0) * 0.4          # Forward tilt
-            )))
-        ),
-        'Standing': (
-            min(1.0, max(0.0, (
-                (np.all(std < 0.3)) * 0.3 +                         # Very low movement
-                (abs(gravity_vector[2]) > 9.5) * 0.4 +              # Very strong Z-axis gravity
-                (abs(gravity_vector[1]) < 0.7) * 0.3                # Minimal tilt
-            )))
-        ),
-        'Laying': (
-            min(1.0, max(0.0, (
-                (np.all(std < 0.3)) * 0.3 +                         # Low movement
-                (abs(gravity_vector[1]) > 9.3) * 0.4 +              # Strong Y-axis gravity
-                (abs(gravity_vector[2]) < 0.7) * 0.3                # Minimal Z-axis gravity
-            )))
-        )
-    }
-    
-    # Calculate activity-specific metrics
-    metrics = {
-        'movement_intensity': movement_intensity.tolist(),
-        'total_variation': total_variation.tolist(),
-        'gravity_vector': gravity_vector.tolist(),
-        'std_deviation': std.tolist(),
-        'range': range_vals.tolist()
-    }
-    
-    return pattern_scores, metrics
-
-@timeout_handler
-def preprocess_input_data(data):
-    """Preprocess input data for prediction"""
-    data = np.array(data)
-    
-    # If we have fewer than 5 points, pad with the last value
-    if len(data) < 5:
-        padding = np.tile(data[-1], (5 - len(data), 1))
-        data = np.vstack([data, padding])
-    
-    # If we have more than 5 points, create sliding windows
-    if len(data) > 5:
-        windows = []
-        for i in range(len(data) - 4):
-            windows.append(data[i:i+5])
-        data = np.array(windows)
-    else:
-        data = data.reshape(1, 5, 3)
-    
-    return data
-
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -270,68 +179,65 @@ def index():
 def predict():
     """Handle prediction requests with optimized processing"""
     try:
+        # Get and validate input data
         data = request.get_json()
-        if not data or 'sensor_data' not in data:
+        logger.info(f"Received request data: {data}")
+
+        if not data or "sensor_data" not in data:
             logger.error("Invalid request: No sensor data provided")
-            return jsonify({'error': 'No sensor data provided'}), 400
+            return jsonify({"error": "Missing sensor_data"}), 400
 
-        sensor_data = data['sensor_data']
-        logger.info(f"Received sensor data with {len(sensor_data)} samples")
+        sensor_data = np.array(data["sensor_data"])
+        logger.info(f"Received sensor data shape: {sensor_data.shape}")
 
-        # Preprocess data with minimal operations
-        preprocessed_data = np.array(sensor_data).reshape(1, 5, 3)
-        logger.info(f"Preprocessed data shape: {preprocessed_data.shape}")
+        # Validate input shape
+        if sensor_data.ndim != 2 or sensor_data.shape[1] != 3:
+            logger.error(f"Invalid sensor data shape: {sensor_data.shape}")
+            return jsonify({"error": "Expected 2D array with shape (timesteps, 3)"}), 400
 
-        # Quick pattern analysis before prediction
-        pattern_analysis = analyze_sequence(sensor_data)
-        logger.info(f"Pattern analysis completed: {pattern_analysis}")
+        # Reshape for RNN (1 sample, N timesteps, 3 features)
+        input_data = sensor_data.reshape((1, sensor_data.shape[0], 3))
+        logger.info(f"Input reshaped to: {input_data.shape}")
 
-        # Make prediction with timeout handling
+        # Make prediction with timing
+        start_time = time.time()
         try:
-            with timeout(10):  # Reduced timeout to 10 seconds
-                prediction = model.predict(preprocessed_data, verbose=0)[0]
-                logger.info(f"Raw prediction: {prediction}")
-                
-                # Clean up memory after prediction
-                cleanup_memory()
-                
-                # Process results
-                result = {
-                    'prediction': ACTIVITIES[np.argmax(prediction)],
-                    'confidence': float(np.max(prediction)),
-                    'probabilities': {
-                        activity: float(prob) 
-                        for activity, prob in zip(ACTIVITIES, prediction)
-                    },
-                    'pattern_analysis': pattern_analysis
-                }
-                
-                logger.info(f"Final prediction: {result['prediction']} with confidence {result['confidence']}")
-                return jsonify(result)
-        except TimeoutError:
-            logger.error("Prediction timed out")
+            prediction = model.predict(input_data, verbose=0)[0]
+            prediction_time = time.time() - start_time
+            logger.info(f"Prediction completed in {prediction_time:.2f} seconds")
+            logger.info(f"Raw prediction: {prediction}")
+
+            # Clean up memory after prediction
             cleanup_memory()
-            return jsonify({'error': 'Prediction timed out. Please try again.'}), 504
+
+            # Process results
+            result = {
+                'prediction': ACTIVITIES[np.argmax(prediction)],
+                'confidence': float(np.max(prediction)),
+                'probabilities': {
+                    activity: float(prob) 
+                    for activity, prob in zip(ACTIVITIES, prediction)
+                },
+                'prediction_time': prediction_time
+            }
+            
+            logger.info(f"Final prediction: {result['prediction']} with confidence {result['confidence']}")
+            return jsonify(result)
+
         except Exception as e:
             logger.error(f"Error during prediction: {str(e)}")
             cleanup_memory()
-            return jsonify({'error': str(e)}), 500
+            return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
 
     except Exception as e:
         logger.error(f"Error processing request: {str(e)}")
         cleanup_memory()
-        return jsonify({'error': str(e)}), 500
-
-def cleanup_memory():
-    """Clean up memory to prevent leaks"""
-    try:
-        import gc
-        gc.collect()
-        tf.keras.backend.clear_session()
-        logger.info("Memory cleanup completed")
-    except Exception as e:
-        logger.error(f"Error during memory cleanup: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    # Initialize model before starting the app
+    if initialize_model():
+        port = int(os.environ.get('PORT', 5000))
+        app.run(host='0.0.0.0', port=port, debug=False)
+    else:
+        logger.error("Failed to initialize model")
