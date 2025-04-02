@@ -403,7 +403,10 @@
             // Hide previous result while loading
             document.querySelector('.result-card').style.display = 'none';
 
-            fetch('/predict', {
+            // Get the current host URL
+            const apiUrl = window.location.origin + '/predict';
+
+            fetch(apiUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -413,17 +416,23 @@
                 })
             })
             .then(response => {
+                console.log('Response status:', response.status);
                 if (!response.ok) {
                     if (response.status === 502) {
                         throw new Error('Server is temporarily unavailable. Please try again in a few moments.');
+                    } else if (response.status === 404) {
+                        throw new Error('API endpoint not found. Please check the server configuration.');
+                    } else if (response.status === 500) {
+                        throw new Error('Server error occurred. Please try again later.');
                     }
                     return response.json().then(err => {
-                        throw new Error(err.error || 'An error occurred while making the prediction');
+                        throw new Error(err.error || `Server error (${response.status}): An error occurred while making the prediction`);
                     });
                 }
                 return response.json();
             })
             .then(data => {
+                console.log('Received data:', data);
                 if (data.error) {
                     throw new Error(data.error);
                 }
@@ -448,7 +457,7 @@
                 document.querySelector('.result-card').style.display = 'block';
             })
             .catch(error => {
-                console.error('Error:', error);
+                console.error('Error details:', error);
                 alert(error.message || 'An error occurred while making the prediction. Please try again.');
                 document.querySelector('.result-card').style.display = 'none';
             });
