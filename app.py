@@ -1,44 +1,106 @@
 from flask import Flask, render_template, request, jsonify
 import numpy as np
-import pandas as pd
+import tensorflow as tf
 from tensorflow.keras.models import Sequential, load_model
 from tensorflow.keras.layers import SimpleRNN, Dense, Dropout
-from tensorflow.keras.utils import to_categorical
+import pandas as pd
 import os
 import logging
 
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# Activity labels
+# Define activities
 ACTIVITIES = ['Walking', 'Running', 'Sitting', 'Standing', 'Laying']
 
-# Sample training data with more distinctive patterns
+# Sample training data for each activity
 SAMPLE_TRAINING_DATA = {
     'Walking': [
-        [0.69, 10.8, -2.03], [6.85, 7.44, -0.5], [0.93, 5.63, -0.5],
-        [1.25, 8.45, -1.2], [0.75, 9.12, -1.8]
+        [0.69, 10.8, -2.03],
+        [0.75, 9.12, -1.8],
+        [0.72, 9.5, -1.9],
+        [0.68, 9.8, -2.0],
+        [0.71, 9.3, -1.85]
     ],
     'Running': [
-        [2.15, 15.2, -3.45], [8.75, 12.3, -2.1], [3.25, 14.8, -2.8],
-        [4.12, 13.5, -3.2], [2.85, 15.0, -3.0]
+        [2.15, 15.2, -3.45],
+        [2.85, 15.0, -3.0],
+        [2.5, 14.8, -3.2],
+        [2.7, 15.1, -3.1],
+        [2.3, 14.9, -3.3]
     ],
-    'Sitting': [  # More distinctive sitting pattern (slight forward tilt)
-        [0.12, 1.5, 9.65], [0.10, 1.4, 9.67], [0.11, 1.6, 9.64],
-        [0.13, 1.5, 9.66], [0.12, 1.4, 9.65]
+    'Sitting': [
+        [0.12, 1.5, 9.65],
+        [0.12, 1.4, 9.65],
+        [0.11, 1.45, 9.66],
+        [0.13, 1.42, 9.64],
+        [0.12, 1.43, 9.65]
     ],
-    'Standing': [  # Vertical position with minimal tilt
-        [0.15, 0.20, 9.81], [0.14, 0.18, 9.82], [0.16, 0.19, 9.81],
-        [0.15, 0.21, 9.80], [0.14, 0.20, 9.81]
+    'Standing': [
+        [0.15, 0.20, 9.81],
+        [0.14, 0.20, 9.81],
+        [0.15, 0.19, 9.82],
+        [0.14, 0.21, 9.80],
+        [0.15, 0.20, 9.81]
     ],
-    'Laying': [  # Horizontal position (z-axis close to 0, y-axis close to gravity)
-        [0.05, 9.81, 0.08], [0.06, 9.82, 0.07], [0.05, 9.81, 0.09],
-        [0.06, 9.80, 0.08], [0.05, 9.81, 0.07]
+    'Laying': [
+        [0.05, 9.81, 0.08],
+        [0.05, 9.81, 0.07],
+        [0.06, 9.80, 0.08],
+        [0.05, 9.82, 0.07],
+        [0.06, 9.81, 0.08]
     ]
 }
+
+def create_model():
+    """Create and compile the RNN model"""
+    model = Sequential([
+        SimpleRNN(64, input_shape=(5, 3), return_sequences=True),
+        Dropout(0.2),
+        SimpleRNN(32),
+        Dropout(0.2),
+        Dense(16, activation='relu'),
+        Dense(len(ACTIVITIES), activation='softmax')
+    ])
+    
+    model.compile(
+        optimizer='adam',
+        loss='categorical_crossentropy',
+        metrics=['accuracy']
+    )
+    
+    return model
+
+def create_training_data():
+    """Create training data from sample patterns"""
+    X = []
+    y = []
+    
+    for activity_idx, (activity, base_data) in enumerate(SAMPLE_TRAINING_DATA.items()):
+        # Use base data
+        X.append(base_data)
+        y.append(activity_idx)
+        
+        # Add variations with controlled noise
+        for _ in range(30):  # Increased variations
+            variation = np.array(base_data) + np.random.normal(
+                0, 
+                0.1 if activity in ['Sitting', 'Standing', 'Laying'] else 0.3,  # Less noise for stationary activities
+                size=np.array(base_data).shape
+            )
+            X.append(variation)
+            y.append(activity_idx)
+    
+    X = np.array(X)
+    y = np.array(y)
+    
+    # Convert labels to one-hot encoding
+    y_one_hot = tf.keras.utils.to_categorical(y, num_classes=len(ACTIVITIES))
+    
+    return X, y_one_hot
 
 def analyze_sequence(data):
     """Analyze a sequence of sensor readings to determine activity patterns"""
@@ -107,115 +169,41 @@ def analyze_sequence(data):
     
     return pattern_scores, metrics
 
-def create_training_data():
-    """Create training data from sample data with more variations"""
-    X = []
-    y = []
-    
-    # Use fixed window size of 5 for consistency
-    window_size = 5
-    
-    for activity_idx, (activity, data) in enumerate(SAMPLE_TRAINING_DATA.items()):
-        # Use the base data as is
-        X.append(data)
-        y.append(activity_idx)
-        
-        # Add noise variations with controlled randomness
-        base_data = np.array(data)
-        for _ in range(30):  # Increased number of variations
-            # Add small random variations that preserve the basic pattern
-            if activity in ['Sitting', 'Standing', 'Laying']:
-                # Less noise for stationary activities
-                noise = np.random.normal(0, 0.05, base_data.shape)
-            else:
-                # More noise for dynamic activities
-                noise = np.random.normal(0, 0.1, base_data.shape)
-            
-            noisy_data = base_data + noise
-            X.append(noisy_data)
-            y.append(activity_idx)
-    
-    X = np.array(X)
-    y = np.array(y)
-    
-    # One-hot encode the labels
-    y = to_categorical(y, num_classes=len(ACTIVITIES))
-    
-    logger.info(f"Created training data with shape: X={X.shape}, y={y.shape}")
-    return X, y
-
-def create_model():
-    """Create a new RNN model"""
-    model = Sequential([
-        SimpleRNN(64, input_shape=(5, 3), return_sequences=True),
-        Dropout(0.2),
-        SimpleRNN(32),
-        Dropout(0.2),
-        Dense(16, activation='relu'),
-        Dense(len(ACTIVITIES), activation='softmax')
-    ])
-    
-    model.compile(
-        optimizer='adam',
-        loss='categorical_crossentropy',
-        metrics=['accuracy']
-    )
-    
-    logger.info("Created new model")
-    return model
-
-# Try to load existing model or create and train a new one
-try:
-    model = load_model('har_rnn_model.h5')
-    logger.info("Loaded existing model")
-except Exception as e:
-    logger.info(f"Creating and training new model: {e}")
-    model = create_model()
-    
-    # Create and prepare training data
-    X_train, y_train = create_training_data()
-    
-    # Train the model
-    history = model.fit(
-        X_train, y_train,
-        epochs=100,
-        batch_size=32,
-        verbose=1
-    )
-    
-    # Save the trained model
-    model.save('har_rnn_model.h5')
-    logger.info(f"Model training completed. Final accuracy: {history.history['accuracy'][-1]:.4f}")
-
 def preprocess_input_data(data):
-    """Preprocess the input data for prediction"""
-    try:
-        # Convert to numpy array
-        sensor_data = np.array(data, dtype=np.float32)
-        logger.debug(f"Input data shape: {sensor_data.shape}")
-        
-        # Create sliding windows if we have more than 5 points
+    """Preprocess input data for prediction"""
+    data = np.array(data)
+    
+    # If we have fewer than 5 points, pad with the last value
+    if len(data) < 5:
+        padding = np.tile(data[-1], (5 - len(data), 1))
+        data = np.vstack([data, padding])
+    
+    # If we have more than 5 points, create sliding windows
+    if len(data) > 5:
         windows = []
-        if len(sensor_data) > 5:
-            for i in range(0, len(sensor_data) - 4):
-                windows.append(sensor_data[i:i+5])
-        else:
-            # Pad if less than 5 points
-            if len(sensor_data) < 5:
-                pad_length = 5 - len(sensor_data)
-                sensor_data = np.pad(sensor_data, ((0, pad_length), (0, 0)), 'constant')
-            windows = [sensor_data]
-        
-        windows = np.array(windows)
-        logger.debug(f"Preprocessed data shape: {windows.shape}")
-        return windows
-        
-    except Exception as e:
-        logger.error(f"Error in preprocessing: {str(e)}")
-        raise
+        for i in range(len(data) - 4):
+            windows.append(data[i:i+5])
+        data = np.array(windows)
+    else:
+        data = data.reshape(1, 5, 3)
+    
+    return data
+
+# Initialize model
+model_path = os.path.join(os.path.dirname(__file__), 'har_rnn_model.h5')
+try:
+    model = load_model(model_path)
+    logger.info("Loaded existing model")
+except (OSError, IOError):
+    logger.info("Model file not found, creating new model")
+    X, y = create_training_data()
+    model = create_model()
+    model.fit(X, y, epochs=50, batch_size=32, verbose=0)
+    model.save(model_path)
+    logger.info("Created and saved new model")
 
 @app.route('/')
-def home():
+def index():
     return render_template('index.html')
 
 @app.route('/predict', methods=['POST'])
@@ -296,5 +284,4 @@ def predict():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    logger.info("Starting Flask server...")
-    app.run(host='0.0.0.0', port=5000, debug=True) 
+    app.run(debug=True) 
