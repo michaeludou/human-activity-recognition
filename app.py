@@ -84,15 +84,13 @@ SAMPLE_TRAINING_DATA = {
 
 @timeout_handler
 def create_model():
-    """Create and compile the RNN model"""
+    """Create and compile an ultra-lightweight RNN model"""
     try:
-        logger.info("Creating new model...")
+        logger.info("Creating new ultra-lightweight model...")
         model = Sequential([
-            SimpleRNN(64, input_shape=(5, 3), return_sequences=True),
-            Dropout(0.2),
-            SimpleRNN(32),
-            Dropout(0.2),
-            Dense(16, activation='relu'),
+            SimpleRNN(8, input_shape=(5, 3), return_sequences=True),
+            SimpleRNN(4),
+            Dense(4, activation='relu'),
             Dense(len(ACTIVITIES), activation='softmax')
         ])
         
@@ -101,7 +99,7 @@ def create_model():
             loss='categorical_crossentropy',
             metrics=['accuracy']
         )
-        logger.info("Model created successfully")
+        logger.info("Ultra-lightweight model created successfully")
         return model
     except Exception as e:
         logger.error(f"Error creating model: {str(e)}")
@@ -109,9 +107,9 @@ def create_model():
 
 @timeout_handler
 def create_training_data():
-    """Create training data from sample patterns"""
+    """Create minimal training data from sample patterns"""
     try:
-        logger.info("Creating training data...")
+        logger.info("Creating minimal training data...")
         X = []
         y = []
         
@@ -120,11 +118,11 @@ def create_training_data():
             X.append(base_data)
             y.append(activity_idx)
             
-            # Add variations with controlled noise
-            for _ in range(30):  # Increased variations
+            # Add minimal variations with controlled noise
+            for _ in range(10):  # Further reduced variations
                 variation = np.array(base_data) + np.random.normal(
                     0, 
-                    0.1 if activity in ['Sitting', 'Standing', 'Laying'] else 0.3,  # Less noise for stationary activities
+                    0.1 if activity in ['Sitting', 'Standing', 'Laying'] else 0.3,
                     size=np.array(base_data).shape
                 )
                 X.append(variation)
@@ -135,7 +133,7 @@ def create_training_data():
         
         # Convert labels to one-hot encoding
         y_one_hot = tf.keras.utils.to_categorical(y, num_classes=len(ACTIVITIES))
-        logger.info(f"Training data created: X shape {X.shape}, y shape {y_one_hot.shape}")
+        logger.info(f"Minimal training data created: X shape {X.shape}, y shape {y_one_hot.shape}")
         return X, y_one_hot
     except Exception as e:
         logger.error(f"Error creating training data: {str(e)}")
@@ -160,7 +158,8 @@ def initialize_model():
             logger.info("Model file not found, creating new model")
             X, y = create_training_data()
             model = create_model()
-            model.fit(X, y, epochs=50, batch_size=32, verbose=1)
+            # Minimal training for faster initialization
+            model.fit(X, y, epochs=10, batch_size=8, verbose=1)
             
             # Ensure directory exists
             os.makedirs(os.path.dirname(model_path), exist_ok=True)
