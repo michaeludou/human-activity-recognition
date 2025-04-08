@@ -16,15 +16,15 @@ Model: Sequential
 _________________________________________________________________
 Layer (type)                 Output Shape              Param #   
 =================================================================
-LSTM (LSTM)                  (None, 128, 64)          17,408    
+LSTM (LSTM)                  (32, 128, 64)            17,408    
 _________________________________________________________________
-Dropout                      (None, 128, 64)          0         
+Dropout                      (32, 128, 64)            0         
 _________________________________________________________________
-LSTM (LSTM)                  (None, 32)               12,416    
+LSTM (LSTM)                  (32, 32)                 12,416    
 _________________________________________________________________
-Dropout                      (None, 32)               0         
+Dropout                      (32, 32)                 0         
 _________________________________________________________________
-Dense                        (None, 5)                165       
+Dense                        (32, 5)                  165       
 =================================================================
 Total params: 29,989
 Trainable params: 29,989
@@ -34,31 +34,37 @@ Non-trainable params: 0
 ### Key Components
 
 1. **Input Layer**
+   - Shape: (batch_size=32, timesteps=128, features=3)
    - Accepts 3-axis accelerometer data
    - Sequences of 128 timesteps
    - 3 features per timestep (X, Y, Z acceleration)
 
 2. **First LSTM Layer**
+   - Output Shape: (batch_size=32, timesteps=128, units=64)
    - 64 LSTM units
    - Return sequences enabled
    - tanh activation
    - Processes temporal patterns in sensor data
 
 3. **First Dropout Layer**
+   - Output Shape: (batch_size=32, timesteps=128, units=64)
    - Rate: 0.2
    - Prevents overfitting
    - Improves generalization
 
 4. **Second LSTM Layer**
+   - Output Shape: (batch_size=32, units=32)
    - 32 LSTM units
    - Return sequences disabled
    - Extracts higher-level temporal features
 
 5. **Second Dropout Layer**
+   - Output Shape: (batch_size=32, units=32)
    - Rate: 0.2
    - Additional regularization
 
 6. **Dense Output Layer**
+   - Output Shape: (batch_size=32, units=5)
    - 5 units (one per activity class)
    - Softmax activation
    - Provides probability distribution over activities
