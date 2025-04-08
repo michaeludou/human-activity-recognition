@@ -10,6 +10,7 @@ import sys
 import gc
 import time
 from functools import wraps
+import traceback
 
 # Configure logging
 logging.basicConfig(
@@ -31,6 +32,7 @@ def timeout_handler(func):
             return func(*args, **kwargs)
         except Exception as e:
             logger.error(f"Error in {func.__name__}: {str(e)}")
+            logger.error(traceback.format_exc())
             raise
     return wrapper
 
@@ -41,38 +43,38 @@ ACTIVITIES = ['Walking', 'Running', 'Sitting', 'Standing', 'Laying']
 SAMPLE_TRAINING_DATA = {
     'Walking': [
         [0.69, 10.8, -2.03],
-        [0.75, 9.12, -1.8],
-        [0.72, 9.5, -1.9],
-        [0.68, 9.8, -2.0],
-        [0.71, 9.3, -1.85]
+        [6.85, 7.44, -0.5],
+        [0.93, 5.63, -0.5],
+        [1.25, 8.45, -1.2],
+        [0.75, 9.12, -1.8]
     ],
     'Running': [
         [2.15, 15.2, -3.45],
-        [2.85, 15.0, -3.0],
-        [2.5, 14.8, -3.2],
-        [2.7, 15.1, -3.1],
-        [2.3, 14.9, -3.3]
+        [8.75, 12.3, -2.1],
+        [3.25, 14.8, -2.8],
+        [4.12, 13.5, -3.2],
+        [2.85, 15.0, -3.0]
     ],
     'Sitting': [
         [0.12, 1.5, 9.65],
-        [0.12, 1.4, 9.65],
-        [0.11, 1.45, 9.66],
-        [0.13, 1.42, 9.64],
-        [0.12, 1.43, 9.65]
+        [0.10, 1.4, 9.64],
+        [0.11, 1.45, 9.63],
+        [0.13, 1.48, 9.65],
+        [0.12, 1.47, 9.64]
     ],
     'Standing': [
         [0.15, 0.20, 9.81],
-        [0.14, 0.20, 9.81],
-        [0.15, 0.19, 9.82],
-        [0.14, 0.21, 9.80],
-        [0.15, 0.20, 9.81]
+        [0.14, 0.18, 9.82],
+        [0.16, 0.19, 9.81],
+        [0.15, 0.21, 9.80],
+        [0.14, 0.20, 9.81]
     ],
     'Laying': [
         [0.05, 9.81, 0.08],
-        [0.05, 9.81, 0.07],
+        [0.06, 9.82, 0.07],
+        [0.05, 9.81, 0.09],
         [0.06, 9.80, 0.08],
-        [0.05, 9.82, 0.07],
-        [0.06, 9.81, 0.08]
+        [0.05, 9.81, 0.07]
     ]
 }
 
@@ -87,13 +89,14 @@ def cleanup_memory():
         logger.info("Memory cleanup completed")
     except Exception as e:
         logger.error(f"Error during memory cleanup: {str(e)}")
+        logger.error(traceback.format_exc())
 
 def create_model():
     """Create and compile a minimal RNN model"""
     try:
         logger.info("Creating new minimal model...")
         model = Sequential([
-            SimpleRNN(4, input_shape=(5, 3)),
+            SimpleRNN(4, input_shape=(None, 3)),  # Changed to accept variable length sequences
             Dense(4, activation='relu'),
             Dense(len(ACTIVITIES), activation='softmax')
         ])
@@ -107,6 +110,7 @@ def create_model():
         return model
     except Exception as e:
         logger.error(f"Error creating model: {str(e)}")
+        logger.error(traceback.format_exc())
         raise
 
 def create_training_data():
@@ -140,6 +144,7 @@ def create_training_data():
         return X, y_one_hot
     except Exception as e:
         logger.error(f"Error creating training data: {str(e)}")
+        logger.error(traceback.format_exc())
         raise
 
 @timeout_handler
@@ -147,7 +152,7 @@ def initialize_model():
     """Initialize or load the model"""
     global model
     try:
-        model_path = os.path.join(os.path.dirname(__file__), 'har_rnn_model.h5')
+        model_path = os.path.join(os.path.dirname(__file__), 'har_rnn_model.keras')
         logger.info(f"Attempting to load model from {model_path}")
         
         if os.path.exists(model_path):
@@ -169,6 +174,7 @@ def initialize_model():
         return True
     except Exception as e:
         logger.error(f"Error initializing model: {str(e)}")
+        logger.error(traceback.format_exc())
         return False
 
 @app.route('/')
@@ -187,6 +193,13 @@ def predict():
             logger.error("Invalid request: No sensor data provided")
             return jsonify({"error": "Missing sensor_data"}), 400
 
+        # Initialize model if not already initialized
+        global model
+        if model is None:
+            logger.info("Model not initialized, initializing now...")
+            if not initialize_model():
+                return jsonify({"error": "Failed to initialize model"}), 500
+
         sensor_data = np.array(data["sensor_data"])
         logger.info(f"Received sensor data shape: {sensor_data.shape}")
 
@@ -195,7 +208,7 @@ def predict():
             logger.error(f"Invalid sensor data shape: {sensor_data.shape}")
             return jsonify({"error": "Expected 2D array with shape (timesteps, 3)"}), 400
 
-        # Reshape for RNN (1 sample, N timesteps, 3 features)
+        # Reshape for RNN (batch_size, timesteps, features)
         input_data = sensor_data.reshape((1, sensor_data.shape[0], 3))
         logger.info(f"Input reshaped to: {input_data.shape}")
 
@@ -226,11 +239,13 @@ def predict():
 
         except Exception as e:
             logger.error(f"Error during prediction: {str(e)}")
+            logger.error(traceback.format_exc())
             cleanup_memory()
             return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
 
     except Exception as e:
         logger.error(f"Error processing request: {str(e)}")
+        logger.error(traceback.format_exc())
         cleanup_memory()
         return jsonify({"error": str(e)}), 500
 
