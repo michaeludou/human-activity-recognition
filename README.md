@@ -6,7 +6,7 @@ A real-time human activity recognition system using Deep Learning (RNN-LSTM) wit
 
 Watch a demonstration of the application in action:
 
-https://github.com/michaeludou/human-activity-recognition/blob/main/assets/demo_HAR.mkv
+https://github.com/michaeludou/human-activity-recognition/blob/main/assets/demo_HAR.mp4
 
 ![Demo Preview](assets/demo.gif)
 
