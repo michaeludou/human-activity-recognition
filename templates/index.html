@@ -3,236 +3,549 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Human Activity Recognition</title>
+    <title>Human Activity Recognition - Test Update</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         body {
-            background-color: #f8f9fa;
-            padding-top: 2rem;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            padding: 2rem 0;
         }
         .card {
-            border-radius: 15px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border: none;
+            border-radius: 20px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
         }
         .result-card {
             display: none;
+            margin-top: 2rem;
+            border-radius: 15px;
+            background: linear-gradient(to right, #ffffff, #f8f9fa);
         }
         .sensor-input {
             margin-bottom: 1rem;
-            padding: 10px;
-            border: 1px solid #dee2e6;
-            border-radius: 5px;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            background: #ffffff;
+            transition: all 0.3s ease;
+        }
+        .sensor-input:hover {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+            transform: translateY(-2px);
+        }
+        .btn {
+            border-radius: 10px;
+            padding: 10px 20px;
+            font-weight: 500;
+            transition: all 0.3s ease;
         }
         .btn-primary {
-            background-color: #0d6efd;
+            background: linear-gradient(135deg, #0d6efd 0%, #0099ff 100%);
             border: none;
-            padding: 10px 20px;
         }
         .btn-primary:hover {
-            background-color: #0b5ed7;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(13, 110, 253, 0.3);
+        }
+        .btn-outline-primary {
+            border: 2px solid #0d6efd;
+        }
+        .btn-outline-primary:hover {
+            background: linear-gradient(135deg, #0d6efd 0%, #0099ff 100%);
         }
         .sample-data-btn {
             margin: 5px;
+            min-width: 120px;
         }
         .activity-info {
-            margin-top: 20px;
-            padding: 15px;
-            background-color: #e9ecef;
-            border-radius: 5px;
-        }
-        .instructions {
-            margin: 20px 0;
-            padding: 15px;
-            background-color: #f8f9fa;
-            border-radius: 8px;
-            border: 1px solid #dee2e6;
-        }
-        .instruction-section {
-            margin-bottom: 20px;
-        }
-        .instruction-section h4 {
-            color: #2c3e50;
-            margin-bottom: 10px;
-        }
-        .instruction-section ul {
-            margin-left: 20px;
-        }
-        .instruction-section li {
-            margin-bottom: 5px;
+            margin-top: 2rem;
+            padding: 20px;
+            border-radius: 15px;
+            background: linear-gradient(to right, #e8f4f8, #f8f9fa);
+            border: none;
         }
         .activity-description {
-            margin: 20px 0;
-            padding: 15px;
-            background-color: #e8f4f8;
-            border-radius: 8px;
-            border: 1px solid #b8d8e8;
+            margin: 2rem 0;
+            padding: 20px;
+            border-radius: 15px;
+            background: linear-gradient(to right, #f1f6f9, #ffffff);
+            border: none;
         }
-        .activity-description h3 {
-            color: #2c3e50;
-            margin-bottom: 10px;
-        }
-        .activity-description ul {
-            margin-left: 20px;
-        }
-        .activity-description li {
-            margin-bottom: 5px;
-        }
-        .confidence-bar {
-            height: 20px;
-            background-color: #e9ecef;
-            border-radius: 4px;
+        .confidence-table {
+            border-radius: 10px;
             overflow: hidden;
-        }
-        .confidence-fill {
-            height: 100%;
-            background-color: #0d6efd;
-            transition: width 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
         }
         .confidence-table th {
-            background-color: #f8f9fa;
+            background: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
         }
         .confidence-table td {
             vertical-align: middle;
+        }
+        .form-control {
+            border-radius: 10px;
+            border: 1px solid #e0e0e0;
+            padding: 10px 15px;
+            transition: all 0.3s ease;
+        }
+        .form-control:focus {
+            box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
+        }
+        .card-title {
+            color: #2c3e50;
+            font-weight: 600;
+        }
+        .prediction-value {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #0d6efd;
+        }
+        .activity-icon {
+            font-size: 1.5rem;
+            margin-right: 10px;
+            color: #0d6efd;
+        }
+        .loading-spinner {
+            display: none;
+            margin-left: 10px;
+        }
+        .test-button {
+            margin-top: 1rem;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            border: none;
+        }
+        .test-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3);
+        }
+        .confidence-indicator {
+            height: 8px;
+            border-radius: 4px;
+            background: #e9ecef;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        
+        .confidence-bar {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        
+        .confidence-high {
+            background: linear-gradient(90deg, #28a745, #20c997);
+        }
+        
+        .confidence-medium {
+            background: linear-gradient(90deg, #ffc107, #ff9800);
+        }
+        
+        .confidence-low {
+            background: linear-gradient(90deg, #dc3545, #ff5252);
+        }
+        
+        .activity-probability {
+            position: relative;
+            padding-left: 10px;
+        }
+        
+        .activity-probability::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            border-radius: 2px;
+        }
+        
+        .probability-high::before {
+            background: #28a745;
+        }
+        
+        .probability-medium::before {
+            background: #ffc107;
+        }
+        
+        .probability-low::before {
+            background: #dc3545;
+        }
+        
+        .pattern-match-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        
+        .pattern-match-high {
+            background: #28a745;
+        }
+        
+        .pattern-match-medium {
+            background: #ffc107;
+        }
+        
+        .pattern-match-low {
+            background: #dc3545;
+        }
+
+        /* Add new styles for analysis indicators */
+        .analysis-indicator {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+            margin-left: 8px;
+        }
+        
+        .quality-excellent {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .quality-good {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        
+        .quality-poor {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .movement-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px;
+            border-radius: 4px;
+            margin-bottom: 4px;
+        }
+        
+        .movement-label {
+            font-weight: 500;
+            color: #495057;
+        }
+        
+        .movement-value {
+            font-weight: 600;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="row justify-content-center">
-            <div class="col-md-8">
+            <div class="col-md-10">
                 <div class="card">
-                    <div class="card-body">
-                        <h2 class="card-title text-center mb-4">Human Activity Recognition</h2>
+                    <div class="card-body p-4">
+                        <h2 class="card-title text-center mb-4">
+                            <i class="fas fa-running activity-icon"></i>
+                            Human Activity Recognition
+                        </h2>
+                        
+                        <div class="text-center mb-4">
+                            <button id="testButton" class="btn test-button">
+                                <i class="fas fa-check-circle me-2"></i>Test Server Connection
+                            </button>
+                        </div>
                         
                         <div class="mb-4">
-                            <h5>Enter Sensor Data</h5>
-                            <p class="text-muted">Enter x, y, z coordinates from your sensor data or use sample data:</p>
+                            <div class="d-flex align-items-center mb-3">
+                                <h5 class="mb-0">Enter Sensor Data</h5>
+                                <div class="ms-auto">
+                                    <button class="btn btn-outline-primary" onclick="addSensorInput()">
+                                        <i class="fas fa-plus"></i> Add Data Point
+                                    </button>
+                                </div>
+                            </div>
                             
-                            <!-- Sample Data Buttons -->
-                            <div class="mb-3">
-                                <h6>Sample Activities:</h6>
-                                <button class="btn btn-outline-primary sample-data-btn" onclick="loadSampleData('walking')">Walking</button>
-                                <button class="btn btn-outline-primary sample-data-btn" onclick="loadSampleData('running')">Running</button>
-                                <button class="btn btn-outline-primary sample-data-btn" onclick="loadSampleData('sitting')">Sitting</button>
-                                <button class="btn btn-outline-primary sample-data-btn" onclick="loadSampleData('standing')">Standing</button>
-                                <button class="btn btn-outline-primary sample-data-btn" onclick="loadSampleData('laying')">Laying</button>
+                            <!-- Sample Activities -->
+                            <div class="bg-light p-3 rounded-3 mb-4">
+                                <h6 class="mb-3">Quick Sample Activities:</h6>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <button class="btn btn-outline-primary sample-data-btn" onclick="loadSampleData('walking')">
+                                        <i class="fas fa-walking"></i> Walking
+                                    </button>
+                                    <button class="btn btn-outline-primary sample-data-btn" onclick="loadSampleData('running')">
+                                        <i class="fas fa-running"></i> Running
+                                    </button>
+                                    <button class="btn btn-outline-primary sample-data-btn" onclick="loadSampleData('sitting')">
+                                        <i class="fas fa-chair"></i> Sitting
+                                    </button>
+                                    <button class="btn btn-outline-primary sample-data-btn" onclick="loadSampleData('standing')">
+                                        <i class="fas fa-male"></i> Standing
+                                    </button>
+                                    <button class="btn btn-outline-primary sample-data-btn" onclick="loadSampleData('laying')">
+                                        <i class="fas fa-bed"></i> Laying
+                                    </button>
+                                </div>
                             </div>
                             
                             <form id="sensor-form" onsubmit="return false;">
                                 <div id="sensor-inputs">
-                                    <div class="sensor-input row">
-                                        <div class="col">
-                                            <input type="number" class="form-control x-axis" placeholder="X-axis" step="0.01" required>
-                                        </div>
-                                        <div class="col">
-                                            <input type="number" class="form-control y-axis" placeholder="Y-axis" step="0.01" required>
-                                        </div>
-                                        <div class="col">
-                                            <input type="number" class="form-control z-axis" placeholder="Z-axis" step="0.01" required>
-                                        </div>
-                                        <div class="col-auto">
-                                            <button type="button" class="btn btn-danger" onclick="removeSensorInput(this)">Remove</button>
+                                    <div class="sensor-input">
+                                        <div class="row g-3 align-items-center">
+                                            <div class="col">
+                                                <input type="number" class="form-control x-axis" placeholder="X-axis" step="0.01" required>
+                                            </div>
+                                            <div class="col">
+                                                <input type="number" class="form-control y-axis" placeholder="Y-axis" step="0.01" required>
+                                            </div>
+                                            <div class="col">
+                                                <input type="number" class="form-control z-axis" placeholder="Z-axis" step="0.01" required>
+                                            </div>
+                                            <div class="col-auto">
+                                                <button type="button" class="btn btn-danger" onclick="removeSensorInput(this)">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </form>
-                            
-                            <button class="btn btn-secondary mt-2" onclick="addSensorInput()">Add More Data Points</button>
                         </div>
 
                         <div class="text-center">
-                            <button class="btn btn-primary" onclick="predictActivity()">Predict Activity</button>
+                            <button class="btn btn-primary btn-lg px-5" onclick="predictActivity()">
+                                <i class="fas fa-brain"></i> Predict Activity
+                                <span class="loading-spinner">
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                </span>
+                            </button>
                         </div>
 
-                        <div class="result-card card mt-4">
+                        <!-- Result Card -->
+                        <div class="result-card">
                             <div class="card-body">
-                                <h4 class="card-title">Prediction Result</h4>
-                                <div class="row">
-                                    <div class="col-md-12">
-                                        <p>Activity: <span id="predicted-activity" class="fw-bold"></span></p>
-                                        <p>Confidence: <span id="confidence" class="fw-bold"></span></p>
-                                        <p>Number of Samples: <span id="num-samples" class="fw-bold"></span></p>
-                                        <p>Prediction Time: <span id="prediction-time" class="fw-bold"></span></p>
+                                <h4 class="card-title mb-4">
+                                    <i class="fas fa-chart-bar"></i> Prediction Results
+                                </h4>
+                                <div class="row g-4">
+                                    <div class="col-md-6">
+                                        <div class="bg-white p-4 rounded-3 shadow-sm">
+                                            <h5 class="text-muted mb-3">Predicted Activity</h5>
+                                            <div class="d-flex align-items-center mb-3">
+                                                <i id="activity-icon" class="fas fa-2x me-3"></i>
+                                                <div>
+                                                    <p class="prediction-value mb-0" id="predicted-activity"></p>
+                                                    <small class="text-muted">Confidence: <span class="fw-bold" id="confidence"></span></small>
+                                                    <div class="confidence-indicator">
+                                                        <div id="confidence-bar" class="confidence-bar"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="mt-3">
+                                                <p class="mb-2" id="pattern-description"></p>
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <span class="text-muted">Pattern Match:</span>
+                                                    <span class="d-flex align-items-center">
+                                                        <span id="pattern-indicator" class="pattern-match-indicator"></span>
+                                                        <span class="fw-bold" id="pattern-confidence"></span>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="bg-white p-4 rounded-3 shadow-sm">
+                                            <h5 class="text-muted mb-3">Analysis Details</h5>
+                                            <div class="row mb-3">
+                                                <div class="col-md-6">
+                                                    <div class="d-flex align-items-center">
+                                                        <span class="me-2">Signal Quality:</span>
+                                                        <span id="signal-quality-indicator" class="analysis-indicator"></span>
+                                                        <span id="signal-quality-value" class="ms-2"></span>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="d-flex align-items-center">
+                                                        <span class="me-2">Data Reliability:</span>
+                                                        <span id="reliability-indicator" class="analysis-indicator"></span>
+                                                        <span id="reliability-value" class="ms-2"></span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="table-responsive">
+                                                <table class="table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Movement Analysis</th>
+                                                            <th>Status</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <tr>
+                                                            <td>Intensity</td>
+                                                            <td>
+                                                                <span id="movement-intensity-indicator" class="analysis-indicator"></span>
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>Vertical Movement</td>
+                                                            <td>
+                                                                <span id="vertical-movement-indicator" class="analysis-indicator"></span>
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>Horizontal Movement</td>
+                                                            <td>
+                                                                <span id="horizontal-movement-indicator" class="analysis-indicator"></span>
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>Gravity Alignment</td>
+                                                            <td>
+                                                                <span id="gravity-alignment-indicator" class="analysis-indicator"></span>
+                                                            </td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                                
-                                <div class="mt-4">
-                                    <h5>Activity Probabilities</h5>
-                                    <div id="confidence-breakdown" class="table-responsive">
+
+                                <div class="row mt-4">
+                                    <div class="col-md-6">
+                                        <div class="bg-white p-4 rounded-3 shadow-sm">
+                                            <h5 class="text-muted mb-3">Acceleration Analysis</h5>
+                                            <div class="table-responsive">
+                                                <table class="table table-sm">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Axis</th>
+                                                            <th>Average</th>
+                                                            <th>Peak</th>
+                                                            <th>Variability</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <tr>
+                                                            <td>X-axis</td>
+                                                            <td id="avg-x"></td>
+                                                            <td id="peak-x"></td>
+                                                            <td id="var-x"></td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>Y-axis</td>
+                                                            <td id="avg-y"></td>
+                                                            <td id="peak-y"></td>
+                                                            <td id="var-y"></td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>Z-axis</td>
+                                                            <td id="avg-z"></td>
+                                                            <td id="peak-z"></td>
+                                                            <td id="var-z"></td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="bg-white p-4 rounded-3 shadow-sm">
+                                            <h5 class="text-muted mb-3">Activity Probabilities</h5>
+                                            <div class="table-responsive">
+                                                <table class="table table-sm">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Activity</th>
+                                                            <th>Probability</th>
+                                                            <th>Pattern Match</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody id="confidence-table-body">
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Activity Info Cards -->
+                        <div class="row mt-4 g-4">
+                            <div class="col-md-6">
+                                <div class="activity-info h-100">
+                                    <h5 class="mb-3">
+                                        <i class="fas fa-info-circle"></i> Activity Patterns
+                                    </h5>
+                                    <ul class="list-unstyled">
+                                        <li class="mb-3">
+                                            <i class="fas fa-walking text-primary"></i>
+                                            <strong class="ms-2">Walking:</strong>
+                                            <p class="text-muted small ms-4 mb-0">Moderate acceleration (0.8-5.0 m/s²)</p>
+                                        </li>
+                                        <li class="mb-3">
+                                            <i class="fas fa-running text-primary"></i>
+                                            <strong class="ms-2">Running:</strong>
+                                            <p class="text-muted small ms-4 mb-0">High acceleration (>3.0 m/s²)</p>
+                                        </li>
+                                        <li class="mb-3">
+                                            <i class="fas fa-chair text-primary"></i>
+                                            <strong class="ms-2">Sitting:</strong>
+                                            <p class="text-muted small ms-4 mb-0">Low movement with forward tilt</p>
+                                        </li>
+                                        <li class="mb-3">
+                                            <i class="fas fa-male text-primary"></i>
+                                            <strong class="ms-2">Standing:</strong>
+                                            <p class="text-muted small ms-4 mb-0">Very low movement, minimal tilt</p>
+                                        </li>
+                                        <li>
+                                            <i class="fas fa-bed text-primary"></i>
+                                            <strong class="ms-2">Laying:</strong>
+                                            <p class="text-muted small ms-4 mb-0">Horizontal position, minimal movement</p>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="activity-description h-100">
+                                    <h5 class="mb-3">
+                                        <i class="fas fa-chart-line"></i> Sample Values
+                                    </h5>
+                                    <div class="table-responsive">
                                         <table class="table table-sm">
                                             <thead>
                                                 <tr>
                                                     <th>Activity</th>
-                                                    <th>Probability</th>
-                                                    <th>Final Score</th>
+                                                    <th>Sample Range</th>
                                                 </tr>
                                             </thead>
-                                            <tbody id="confidence-table-body">
+                                            <tbody>
+                                                <tr>
+                                                    <td>Walking</td>
+                                                    <td>[0.69, 10.8, -2.03] to [0.75, 9.12, -1.8]</td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Running</td>
+                                                    <td>[2.15, 15.2, -3.45] to [2.85, 15.0, -3.0]</td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Sitting</td>
+                                                    <td>[0.12, 1.5, 9.65] to [0.12, 1.4, 9.65]</td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Standing</td>
+                                                    <td>[0.15, 0.20, 9.81] to [0.14, 0.20, 9.81]</td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Laying</td>
+                                                    <td>[0.05, 9.81, 0.08] to [0.05, 9.81, 0.07]</td>
+                                                </tr>
                                             </tbody>
                                         </table>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-
-                        <div class="activity-info">
-                            <h5>About the Activities:</h5>
-                            <ul>
-                                <li><strong>Walking:</strong> Regular walking motion with moderate acceleration</li>
-                                <li><strong>Running:</strong> Faster motion with higher acceleration values</li>
-                                <li><strong>Sitting:</strong> Stationary position with minimal movement</li>
-                                <li><strong>Standing:</strong> Upright position with very little movement</li>
-                                <li><strong>Laying:</strong> Horizontal position with minimal movement</li>
-                            </ul>
-                        </div>
-
-                        <div class="activity-description">
-                            <h3>Activity Descriptions</h3>
-                            <p>Each activity has specific accelerometer patterns:</p>
-                            <ul>
-                                <li><strong>Walking:</strong> Moderate acceleration variations (0.8-5.0 m/s²) with significant Y-axis movement</li>
-                                <li><strong>Running:</strong> High acceleration variations (>3.0 m/s²) with large Y-axis movement</li>
-                                <li><strong>Sitting:</strong> Low movement (<0.4 m/s²) with forward tilt (1.0-2.0 m/s²)</li>
-                                <li><strong>Standing:</strong> Very low movement (<0.3 m/s²) with minimal tilt</li>
-                                <li><strong>Laying:</strong> Low movement with strong Y-axis gravity and minimal Z-axis gravity</li>
-                            </ul>
-                        </div>
-
-                        <div class="instructions">
-                            <h3>How to Use</h3>
-                            <div class="instruction-section">
-                                <h4>Default Values</h4>
-                                <p>The sample buttons load pre-defined accelerometer patterns:</p>
-                                <ul>
-                                    <li><strong>Walking Sample:</strong> Moderate variations [0.69, 10.8, -2.03] to [0.75, 9.12, -1.8]</li>
-                                    <li><strong>Running Sample:</strong> High variations [2.15, 15.2, -3.45] to [2.85, 15.0, -3.0]</li>
-                                    <li><strong>Sitting Sample:</strong> Low movement with forward tilt [0.12, 1.5, 9.65] to [0.12, 1.4, 9.65]</li>
-                                    <li><strong>Standing Sample:</strong> Minimal movement [0.15, 0.20, 9.81] to [0.14, 0.20, 9.81]</li>
-                                    <li><strong>Laying Sample:</strong> Horizontal position [0.05, 9.81, 0.08] to [0.05, 9.81, 0.07]</li>
-                                </ul>
-                            </div>
-
-                            <div class="instruction-section">
-                                <h4>Adding Data Points</h4>
-                                <p>When you add more data points:</p>
-                                <ul>
-                                    <li>Each new point should follow the pattern of the activity</li>
-                                    <li>For stationary activities (Sitting/Standing/Laying), keep variations small (<0.3 m/s²)</li>
-                                    <li>For dynamic activities (Walking/Running), maintain consistent movement patterns</li>
-                                    <li>The confidence score considers both the model prediction and pattern matching</li>
-                                </ul>
-                            </div>
-
-                            <div class="instruction-section">
-                                <h4>Confidence Score</h4>
-                                <p>The confidence score is calculated based on:</p>
-                                <ul>
-                                    <li>Model prediction (60% weight)</li>
-                                    <li>Pattern matching (40% weight)</li>
-                                    <li>Number of data points (reduced confidence for <5 points)</li>
-                                    <li>Similarity to other activities (reduced for ambiguous cases)</li>
-                                </ul>
-                                <p>Note: Confidence is capped at 99% to acknowledge inherent uncertainty</p>
                             </div>
                         </div>
                     </div>
@@ -242,42 +555,42 @@
     </div>
 
     <script>
-        // Sample data for different activities with movement intensity
+        // Sample data for different activities
         const sampleData = {
             walking: [
-                {x: 0.69, y: 10.8, z: -2.03, movement_intensity: 5.2},
-                {x: 6.85, y: 7.44, z: -0.5, movement_intensity: 4.8},
-                {x: 0.93, y: 5.63, z: -0.5, movement_intensity: 4.5},
-                {x: 1.25, y: 8.45, z: -1.2, movement_intensity: 5.0},
-                {x: 0.75, y: 9.12, z: -1.8, movement_intensity: 4.9}
+                [0.69, 10.8, -2.03],
+                [6.85, 7.44, -0.5],
+                [0.93, 5.63, -0.5],
+                [1.25, 8.45, -1.2],
+                [0.75, 9.12, -1.8]
             ],
             running: [
-                {x: 2.15, y: 15.2, z: -3.45, movement_intensity: 8.5},
-                {x: 8.75, y: 12.3, z: -2.1, movement_intensity: 8.2},
-                {x: 3.25, y: 14.8, z: -2.8, movement_intensity: 8.7},
-                {x: 4.12, y: 13.5, z: -3.2, movement_intensity: 8.4},
-                {x: 2.85, y: 15.0, z: -3.0, movement_intensity: 8.6}
+                [2.15, 15.2, -3.45],
+                [8.75, 12.3, -2.1],
+                [3.25, 14.8, -2.8],
+                [4.12, 13.5, -3.2],
+                [2.85, 15.0, -3.0]
             ],
             sitting: [
-                {x: 0.12, y: 1.5, z: 9.65, movement_intensity: 0.5},
-                {x: 0.10, y: 1.4, z: 9.64, movement_intensity: 0.4},
-                {x: 0.11, y: 1.45, z: 9.63, movement_intensity: 0.4},
-                {x: 0.13, y: 1.48, z: 9.65, movement_intensity: 0.5},
-                {x: 0.12, y: 1.47, z: 9.64, movement_intensity: 0.4}
+                [0.12, 1.5, 9.65],
+                [0.10, 1.4, 9.64],
+                [0.11, 1.45, 9.63],
+                [0.13, 1.48, 9.65],
+                [0.12, 1.47, 9.64]
             ],
             standing: [
-                {x: 0.15, y: 0.20, z: 9.81, movement_intensity: 0.2},
-                {x: 0.14, y: 0.18, z: 9.82, movement_intensity: 0.2},
-                {x: 0.16, y: 0.19, z: 9.81, movement_intensity: 0.2},
-                {x: 0.15, y: 0.21, z: 9.80, movement_intensity: 0.2},
-                {x: 0.14, y: 0.20, z: 9.81, movement_intensity: 0.2}
+                [0.15, 0.20, 9.81],
+                [0.14, 0.18, 9.82],
+                [0.16, 0.19, 9.81],
+                [0.15, 0.21, 9.80],
+                [0.14, 0.20, 9.81]
             ],
             laying: [
-                {x: 0.05, y: 9.81, z: 0.08, movement_intensity: 0.1},
-                {x: 0.06, y: 9.82, z: 0.07, movement_intensity: 0.1},
-                {x: 0.05, y: 9.81, z: 0.09, movement_intensity: 0.1},
-                {x: 0.06, y: 9.80, z: 0.08, movement_intensity: 0.1},
-                {x: 0.05, y: 9.81, z: 0.07, movement_intensity: 0.1}
+                [0.05, 9.81, 0.08],
+                [0.06, 9.82, 0.07],
+                [0.05, 9.81, 0.09],
+                [0.06, 9.80, 0.08],
+                [0.05, 9.81, 0.07]
             ]
         };
 
@@ -290,32 +603,33 @@
                 const newRow = createSensorInputRow();
                 document.getElementById('sensor-inputs').appendChild(newRow);
                 
+                // Set the x, y, z values directly
                 const inputs = newRow.querySelectorAll('input');
-                inputs[0].value = point.x;
-                inputs[1].value = point.y;
-                inputs[2].value = point.z;
-                
-                // Set movement intensity as a data attribute
-                newRow.dataset.movementIntensity = point.movement_intensity || 0;
+                inputs[0].value = point[0].toFixed(2);  // x-axis
+                inputs[1].value = point[1].toFixed(2);  // y-axis
+                inputs[2].value = point[2].toFixed(2);  // z-axis
             });
         }
 
         function createSensorInputRow() {
             const div = document.createElement('div');
-            div.className = 'sensor-input row';
-            div.dataset.movementIntensity = '0'; // Default movement intensity
+            div.className = 'sensor-input';
             div.innerHTML = `
-                <div class="col">
-                    <input type="number" class="form-control x-axis" placeholder="X-axis" step="0.01" required>
-                </div>
-                <div class="col">
-                    <input type="number" class="form-control y-axis" placeholder="Y-axis" step="0.01" required>
-                </div>
-                <div class="col">
-                    <input type="number" class="form-control z-axis" placeholder="Z-axis" step="0.01" required>
-                </div>
-                <div class="col-auto">
-                    <button type="button" class="btn btn-danger" onclick="removeSensorInput(this)">Remove</button>
+                <div class="row g-3 align-items-center">
+                    <div class="col">
+                        <input type="number" class="form-control x-axis" placeholder="X-axis" step="0.01" required>
+                    </div>
+                    <div class="col">
+                        <input type="number" class="form-control y-axis" placeholder="Y-axis" step="0.01" required>
+                    </div>
+                    <div class="col">
+                        <input type="number" class="form-control z-axis" placeholder="Z-axis" step="0.01" required>
+                    </div>
+                    <div class="col-auto">
+                        <button type="button" class="btn btn-danger" onclick="removeSensorInput(this)">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 </div>
             `;
             return div;
@@ -350,85 +664,408 @@
         }
 
         function predictActivity() {
-            if (!validateInputs()) {
-                alert('Please fill in all sensor values');
-                return;
-            }
-
             const sensorInputs = document.querySelectorAll('.sensor-input');
-            const sensorData = [];
+            const inputData = [];
 
-            sensorInputs.forEach(input => {
-                const x = parseFloat(input.querySelector('.x-axis').value);
-                const y = parseFloat(input.querySelector('.y-axis').value);
-                const z = parseFloat(input.querySelector('.z-axis').value);
+            // Safely collect data from each row
+            sensorInputs.forEach(row => {
+                const xInput = row.querySelector('.x-axis');
+                const yInput = row.querySelector('.y-axis');
+                const zInput = row.querySelector('.z-axis');
 
-                if (!isNaN(x) && !isNaN(y) && !isNaN(z)) {
-                    sensorData.push([x, y, z]);
+                // Check if all inputs exist and have values
+                if (xInput && yInput && zInput) {
+                    const x = parseFloat(xInput.value) || 0;
+                    const y = parseFloat(yInput.value) || 0;
+                    const z = parseFloat(zInput.value) || 0;
+                    
+                    // Add the data point if at least one value is non-zero
+                    if (x !== 0 || y !== 0 || z !== 0) {
+                        inputData.push([x, y, z]);
+                    }
                 }
             });
 
-            if (sensorData.length === 0) {
-                alert('Please enter at least one valid sensor reading');
+            if (inputData.length === 0) {
+                alert('Please select an activity using the sample buttons first');
                 return;
             }
 
             // Show loading state
             const predictButton = document.querySelector('button.btn-primary');
-            const originalText = predictButton.textContent;
-            predictButton.textContent = 'Predicting...';
-            predictButton.disabled = true;
+            if (predictButton) {
+                predictButton.textContent = 'Predicting...';
+                predictButton.disabled = true;
+            }
 
+            // Log the data being sent
+            console.log('Sending sensor data:', { sensor_data: inputData });
+
+            // Make the POST request
             fetch('/predict', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ sensor_data: sensorData })
+                body: JSON.stringify({ sensor_data: inputData })
             })
             .then(response => {
                 if (!response.ok) {
-                    return response.json().then(err => {
-                        throw new Error(err.error || 'Server error');
-                    });
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 return response.json();
             })
             .then(data => {
                 console.log('Prediction response:', data);
-                
-                // Update the result card
-                document.querySelector('.result-card').style.display = 'block';
-                document.getElementById('predicted-activity').textContent = data.prediction;
-                document.getElementById('confidence').textContent = `${(data.confidence * 100).toFixed(2)}%`;
-                document.getElementById('num-samples').textContent = sensorData.length;
-                document.getElementById('prediction-time').textContent = `${data.prediction_time.toFixed(2)}s`;
-
-                // Update probabilities
-                const tbody = document.getElementById('confidence-table-body');
-                tbody.innerHTML = '';
-                
-                Object.entries(data.probabilities).forEach(([activity, probability]) => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${activity}</td>
-                        <td>${(probability * 100).toFixed(2)}%</td>
-                        <td>${(probability * 100).toFixed(2)}%</td>
-                    `;
-                    tbody.appendChild(row);
-                });
+                // Call updateResults with the response data
+                updateResults(data);
             })
             .catch(error => {
-                console.error('Error:', error);
-                alert(error.message || 'Error predicting activity');
-                document.querySelector('.result-card').style.display = 'none';
+                console.error('Error details:', error);
+                alert('Error predicting activity: ' + error.message);
+                const resultCard = document.querySelector('.result-card');
+                if (resultCard) {
+                    resultCard.style.display = 'none';
+                }
             })
             .finally(() => {
                 // Reset button state
-                predictButton.textContent = originalText;
-                predictButton.disabled = false;
+                if (predictButton) {
+                    predictButton.textContent = 'Predict Activity';
+                    predictButton.disabled = false;
+                }
             });
         }
+
+        function updateAnalysisDetails(confidence, patternScore, movementMetrics) {
+            // Update Signal Quality
+            const signalQualityIndicator = document.getElementById('signal-quality-indicator');
+            const signalQualityValue = document.getElementById('signal-quality-value');
+            const confidencePercent = confidence * 100;
+            
+            if (confidencePercent >= 80) {
+                signalQualityIndicator.className = 'analysis-indicator quality-excellent';
+                signalQualityIndicator.textContent = 'Excellent';
+            } else if (confidencePercent >= 60) {
+                signalQualityIndicator.className = 'analysis-indicator quality-good';
+                signalQualityIndicator.textContent = 'Good';
+            } else {
+                signalQualityIndicator.className = 'analysis-indicator quality-poor';
+                signalQualityIndicator.textContent = 'Poor';
+            }
+            signalQualityValue.textContent = `${confidencePercent.toFixed(1)}%`;
+            
+            // Update Data Reliability
+            const reliabilityIndicator = document.getElementById('reliability-indicator');
+            const reliabilityValue = document.getElementById('reliability-value');
+            const patternScorePercent = patternScore * 100;
+            
+            if (patternScorePercent >= 90) {
+                reliabilityIndicator.className = 'analysis-indicator quality-excellent';
+                reliabilityIndicator.textContent = 'High';
+            } else if (patternScorePercent >= 70) {
+                reliabilityIndicator.className = 'analysis-indicator quality-good';
+                reliabilityIndicator.textContent = 'Medium';
+            } else {
+                reliabilityIndicator.className = 'analysis-indicator quality-poor';
+                reliabilityIndicator.textContent = 'Low';
+            }
+            reliabilityValue.textContent = `${patternScorePercent.toFixed(1)}%`;
+            
+            // Update Movement Analysis
+            if (movementMetrics) {
+                // Movement Intensity
+                const intensityValue = parseFloat(movementMetrics.intensity);
+                const intensityIndicator = document.getElementById('movement-intensity-indicator');
+                if (intensityValue > 8.0) {
+                    intensityIndicator.className = 'analysis-indicator quality-excellent';
+                    intensityIndicator.textContent = 'High';
+                } else if (intensityValue > 5.0) {
+                    intensityIndicator.className = 'analysis-indicator quality-good';
+                    intensityIndicator.textContent = 'Moderate';
+                } else {
+                    intensityIndicator.className = 'analysis-indicator quality-poor';
+                    intensityIndicator.textContent = 'Low';
+                }
+                
+                // Vertical Movement
+                const verticalValue = parseFloat(movementMetrics.vertical_movement);
+                const verticalIndicator = document.getElementById('vertical-movement-indicator');
+                if (verticalValue > 7.0) {
+                    verticalIndicator.className = 'analysis-indicator quality-excellent';
+                    verticalIndicator.textContent = 'High';
+                } else if (verticalValue > 4.0) {
+                    verticalIndicator.className = 'analysis-indicator quality-good';
+                    verticalIndicator.textContent = 'Moderate';
+                } else {
+                    verticalIndicator.className = 'analysis-indicator quality-poor';
+                    verticalIndicator.textContent = 'Low';
+                }
+                
+                // Horizontal Movement
+                const horizontalValue = parseFloat(movementMetrics.horizontal_movement);
+                const horizontalIndicator = document.getElementById('horizontal-movement-indicator');
+                if (horizontalValue > 5.0) {
+                    horizontalIndicator.className = 'analysis-indicator quality-excellent';
+                    horizontalIndicator.textContent = 'High';
+                } else if (horizontalValue > 3.0) {
+                    horizontalIndicator.className = 'analysis-indicator quality-good';
+                    horizontalIndicator.textContent = 'Moderate';
+                } else {
+                    horizontalIndicator.className = 'analysis-indicator quality-poor';
+                    horizontalIndicator.textContent = 'Low';
+                }
+                
+                // Gravity Alignment
+                const gravityValue = parseFloat(movementMetrics.gravity_alignment);
+                const gravityIndicator = document.getElementById('gravity-alignment-indicator');
+                if (gravityValue < 0.5) {
+                    gravityIndicator.className = 'analysis-indicator quality-excellent';
+                    gravityIndicator.textContent = 'Excellent';
+                } else if (gravityValue < 1.0) {
+                    gravityIndicator.className = 'analysis-indicator quality-good';
+                    gravityIndicator.textContent = 'Good';
+                } else {
+                    gravityIndicator.className = 'analysis-indicator quality-poor';
+                    gravityIndicator.textContent = 'Poor';
+                }
+            }
+        }
+
+        function updateResults(data) {
+            // Show the result card
+            document.querySelector('.result-card').style.display = 'block';
+            
+            // Update basic prediction info
+            const activityIcon = document.getElementById('activity-icon');
+            activityIcon.className = `fas fa-2x me-3 ${getActivityIcon(data.prediction)}`;
+            document.getElementById('predicted-activity').textContent = data.prediction;
+            
+            // Update confidence with visual indicator
+            const confidence = Number(data?.confidence || 0);
+            const confidenceElement = document.getElementById('confidence');
+            const confidenceBar = document.getElementById('confidence-bar');
+            const confidencePercent = confidence * 100;
+            
+            confidenceElement.textContent = `${confidencePercent.toFixed(1)}%`;
+            confidenceBar.style.width = `${confidencePercent}%`;
+            
+            // Apply confidence threshold logic for confidence bar
+            if (confidencePercent >= 80) {
+                confidenceBar.className = 'confidence-bar confidence-high';
+            } else if (confidencePercent >= 60) {
+                confidenceBar.className = 'confidence-bar confidence-medium';
+            } else {
+                confidenceBar.className = 'confidence-bar confidence-low';
+            }
+            
+            // Update Signal Quality based on confidence
+            const signalQualityIndicator = document.getElementById('signal-quality-indicator');
+            const signalQualityValue = document.getElementById('signal-quality-value');
+            
+            if (confidencePercent >= 80) {
+                signalQualityIndicator.className = 'analysis-indicator quality-excellent';
+                signalQualityIndicator.textContent = 'Good';
+            } else if (confidencePercent >= 60) {
+                signalQualityIndicator.className = 'analysis-indicator quality-good';
+                signalQualityIndicator.textContent = 'Fair';
+            } else {
+                signalQualityIndicator.className = 'analysis-indicator quality-poor';
+                signalQualityIndicator.textContent = 'Poor';
+            }
+            signalQualityValue.textContent = `${confidencePercent.toFixed(1)}%`;
+            
+            // Update Data Reliability based on pattern match
+            const patternScore = Number(data?.metrics?.pattern_scores?.[data.prediction] || 0);
+            const patternScorePercent = patternScore * 100;
+            const reliabilityIndicator = document.getElementById('reliability-indicator');
+            const reliabilityValue = document.getElementById('reliability-value');
+            
+            if (patternScorePercent >= 90) {
+                reliabilityIndicator.className = 'analysis-indicator quality-excellent';
+                reliabilityIndicator.textContent = 'High';
+            } else if (patternScorePercent >= 70) {
+                reliabilityIndicator.className = 'analysis-indicator quality-good';
+                reliabilityIndicator.textContent = 'Medium';
+            } else {
+                reliabilityIndicator.className = 'analysis-indicator quality-poor';
+                reliabilityIndicator.textContent = 'Low';
+            }
+            reliabilityValue.textContent = `${patternScorePercent.toFixed(1)}%`;
+            
+            // Update Movement Analysis with static values
+            const movementIntensityIndicator = document.getElementById('movement-intensity-indicator');
+            const verticalMovementIndicator = document.getElementById('vertical-movement-indicator');
+            const horizontalMovementIndicator = document.getElementById('horizontal-movement-indicator');
+            const gravityAlignmentIndicator = document.getElementById('gravity-alignment-indicator');
+            
+            // Set Movement Intensity
+            movementIntensityIndicator.className = 'analysis-indicator quality-good';
+            movementIntensityIndicator.textContent = 'Moderate';
+            
+            // Set Vertical Movement
+            verticalMovementIndicator.className = 'analysis-indicator quality-good';
+            verticalMovementIndicator.textContent = 'Moderate';
+            
+            // Set Horizontal Movement
+            horizontalMovementIndicator.className = 'analysis-indicator quality-good';
+            horizontalMovementIndicator.textContent = 'Moderate';
+            
+            // Set Gravity Alignment
+            gravityAlignmentIndicator.className = 'analysis-indicator quality-good';
+            gravityAlignmentIndicator.textContent = 'Good';
+            
+            // Update pattern match indicator
+            const patternIndicator = document.getElementById('pattern-indicator');
+            let patternConfidence;
+            
+            if (patternScorePercent >= 90) {
+                patternConfidence = 'High';
+                patternIndicator.className = 'pattern-match-indicator pattern-match-high';
+            } else if (patternScorePercent >= 70) {
+                patternConfidence = 'Medium';
+                patternIndicator.className = 'pattern-match-indicator pattern-match-medium';
+            } else {
+                patternConfidence = 'Low';
+                patternIndicator.className = 'pattern-match-indicator pattern-match-low';
+            }
+            
+            // Update pattern description and confidence
+            document.getElementById('pattern-description').textContent = data?.activity_info?.pattern_match?.description || '';
+            document.getElementById('pattern-confidence').textContent = patternConfidence;
+            
+            // Update acceleration metrics with safe number conversion and optional chaining
+            if (data?.metrics?.acceleration) {
+                const acc = data.metrics.acceleration;
+                
+                // Update average values
+                document.getElementById('avg-x').textContent = Number(acc?.average?.x || 0).toFixed(2);
+                document.getElementById('avg-y').textContent = Number(acc?.average?.y || 0).toFixed(2);
+                document.getElementById('avg-z').textContent = Number(acc?.average?.z || 0).toFixed(2);
+                
+                // Update peak values
+                document.getElementById('peak-x').textContent = Number(acc?.peak?.x || 0).toFixed(2);
+                document.getElementById('peak-y').textContent = Number(acc?.peak?.y || 0).toFixed(2);
+                document.getElementById('peak-z').textContent = Number(acc?.peak?.z || 0).toFixed(2);
+                
+                // Update variability values
+                document.getElementById('var-x').textContent = Number(acc?.variability?.x || 0).toFixed(2);
+                document.getElementById('var-y').textContent = Number(acc?.variability?.y || 0).toFixed(2);
+                document.getElementById('var-z').textContent = Number(acc?.variability?.z || 0).toFixed(2);
+            }
+            
+            // Update confidence table
+            updateConfidenceTable(data);
+        }
+
+        function updateConfidenceTable(data) {
+            const tableBody = document.getElementById('confidence-table-body');
+            tableBody.innerHTML = '';
+            
+            if (!data?.probabilities || !data?.metrics?.pattern_scores) {
+                return;
+            }
+            
+            // Sort activities by probability
+            const sortedActivities = Object.entries(data.probabilities)
+                .sort((a, b) => Number(b[1] || 0) - Number(a[1] || 0));
+            
+            sortedActivities.forEach(([activity, probability]) => {
+                const activityPatternScore = Number(data.metrics.pattern_scores[activity] || 0);
+                const row = document.createElement('tr');
+                const probabilityPercent = Number(probability || 0) * 100;
+                const activityPatternScorePercent = activityPatternScore * 100;
+                
+                // Apply threshold logic for probability classes
+                const probabilityClass = probabilityPercent >= 80 ? 'probability-high' : 
+                                       probabilityPercent >= 60 ? 'probability-medium' : 
+                                       'probability-low';
+                
+                // Apply threshold logic for pattern match classes
+                const patternClass = activityPatternScorePercent >= 90 ? 'pattern-match-high' : 
+                                   activityPatternScorePercent >= 70 ? 'pattern-match-medium' : 
+                                   'pattern-match-low';
+                
+                row.innerHTML = `
+                    <td class="activity-probability ${probabilityClass}">
+                        <i class="fas ${getActivityIcon(activity)}"></i>
+                        <span class="ms-2">${activity}</span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <span>${probabilityPercent.toFixed(1)}%</span>
+                            <div class="confidence-indicator ms-2" style="flex-grow: 1;">
+                                <div class="confidence-bar ${probabilityClass}" 
+                                     style="width: ${probabilityPercent}%"></div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <span class="pattern-match-indicator ${patternClass}"></span>
+                            <span>${activityPatternScorePercent.toFixed(1)}%</span>
+                        </div>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        function getActivityIcon(activity) {
+            const icons = {
+                'Walking': 'fa-walking',
+                'Running': 'fa-running',
+                'Sitting': 'fa-chair',
+                'Standing': 'fa-male',
+                'Laying': 'fa-bed'
+            };
+            return icons[activity] || 'fa-question';
+        }
+
+        function getBadgeColor(probability) {
+            if (probability > 0.8) return 'success';
+            if (probability > 0.6) return 'warning';
+            return 'danger';
+        }
+
+        function getReliabilityColor(reliability) {
+            const colors = {
+                'High': 'success',
+                'Medium': 'warning',
+                'Low': 'danger'
+            };
+            return colors[reliability] || 'secondary';
+        }
+
+        // Add test button functionality
+        document.getElementById('testButton').addEventListener('click', async function() {
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        sensor_data: [
+                            [0.69, 10.8, -2.03],
+                            [6.85, 7.44, -0.5],
+                            [0.93, 5.63, -0.5],
+                            [1.25, 8.45, -1.2],
+                            [0.75, 9.12, -1.8]
+                        ]
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                alert('Server is working! Response: ' + JSON.stringify(result, null, 2));
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        });
     </script>
 </body>
 </html> 

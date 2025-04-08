@@ -92,21 +92,31 @@ def cleanup_memory():
         logger.error(traceback.format_exc())
 
 def create_model():
-    """Create and compile a minimal RNN model"""
+    """Create and compile an optimized RNN model"""
     try:
-        logger.info("Creating new minimal model...")
+        logger.info("Creating optimized model...")
         model = Sequential([
-            SimpleRNN(4, input_shape=(None, 3)),  # Changed to accept variable length sequences
-            Dense(4, activation='relu'),
+            # Input layer with batch normalization
+            SimpleRNN(64, input_shape=(None, 3), return_sequences=True),
+            Dropout(0.2),
+            # Second RNN layer
+            SimpleRNN(32),
+            Dropout(0.2),
+            # Dense layers for classification
+            Dense(32, activation='relu'),
+            Dropout(0.2),
             Dense(len(ACTIVITIES), activation='softmax')
         ])
         
+        # Use a lower learning rate for better stability
+        optimizer = tf.keras.optimizers.Adam(learning_rate=0.0005)
+        
         model.compile(
-            optimizer='adam',
+            optimizer=optimizer,
             loss='categorical_crossentropy',
             metrics=['accuracy']
         )
-        logger.info("Minimal model created successfully")
+        logger.info("Model created successfully")
         return model
     except Exception as e:
         logger.error(f"Error creating model: {str(e)}")
@@ -114,33 +124,78 @@ def create_model():
         raise
 
 def create_training_data():
-    """Create minimal training data from sample patterns"""
+    """Create optimized training data with clear distinctions between activities"""
     try:
-        logger.info("Creating minimal training data...")
+        logger.info("Creating training data...")
         X = []
         y = []
         
+        # Define characteristic patterns for each activity
+        activity_patterns = {
+            'Walking': {
+                'y_range': (5.0, 12.0),    # Moderate vertical movement
+                'z_range': (-3.0, -0.5),   # Forward tilt
+                'noise': 0.2
+            },
+            'Running': {
+                'y_range': (12.0, 18.0),   # High vertical movement
+                'z_range': (-4.0, -2.0),   # Forward tilt
+                'noise': 0.3
+            },
+            'Sitting': {
+                'y_range': (0.5, 2.0),     # Low vertical movement
+                'z_range': (9.5, 9.8),     # Upward orientation
+                'noise': 0.05
+            },
+            'Standing': {
+                'y_range': (0.0, 0.3),     # Minimal movement
+                'z_range': (9.7, 9.9),     # Straight upward
+                'noise': 0.02
+            },
+            'Laying': {
+                'y_range': (9.7, 9.9),     # Sideways gravity
+                'z_range': (-0.2, 0.2),    # Minimal vertical
+                'noise': 0.02
+            }
+        }
+        
         for activity_idx, (activity, base_data) in enumerate(SAMPLE_TRAINING_DATA.items()):
-            # Use base data
-            X.append(base_data)
-            y.append(activity_idx)
+            pattern = activity_patterns[activity]
             
-            # Add minimal variations
-            for _ in range(5):  # Very minimal variations
-                variation = np.array(base_data) + np.random.normal(
-                    0, 
-                    0.1 if activity in ['Sitting', 'Standing', 'Laying'] else 0.3,
-                    size=np.array(base_data).shape
-                )
+            # Generate variations
+            num_variations = 50  # Reduced number but more distinct patterns
+            
+            for _ in range(num_variations):
+                # Create sequence of 5-10 measurements
+                sequence_length = np.random.randint(5, 11)
+                variation = []
+                
+                for _ in range(sequence_length):
+                    # Generate characteristic pattern for this activity
+                    x = np.random.normal(0, pattern['noise'])
+                    y = np.random.uniform(*pattern['y_range'])
+                    z = np.random.uniform(*pattern['z_range'])
+                    
+                    # Add activity-specific patterns
+                    if activity == 'Walking':
+                        # Add rhythmic pattern
+                        x += np.sin(_ * 0.5) * 0.5
+                        y += np.sin(_ * 0.5) * 2.0
+                    elif activity == 'Running':
+                        # Add stronger rhythmic pattern
+                        x += np.sin(_ * 0.8) * 1.0
+                        y += np.sin(_ * 0.8) * 3.0
+                    
+                    variation.append([x, y, z])
+                
                 X.append(variation)
                 y.append(activity_idx)
         
         X = np.array(X)
         y = np.array(y)
-        
-        # Convert labels to one-hot encoding
         y_one_hot = tf.keras.utils.to_categorical(y, num_classes=len(ACTIVITIES))
-        logger.info(f"Minimal training data created: X shape {X.shape}, y shape {y_one_hot.shape}")
+        
+        logger.info(f"Training data created: X shape {X.shape}, y shape {y_one_hot.shape}")
         return X, y_one_hot
     except Exception as e:
         logger.error(f"Error creating training data: {str(e)}")
@@ -149,27 +204,51 @@ def create_training_data():
 
 @timeout_handler
 def initialize_model():
-    """Initialize or load the model"""
+    """Initialize or load the model with improved training"""
     global model
     try:
         model_path = os.path.join(os.path.dirname(__file__), 'har_rnn_model.keras')
         logger.info(f"Attempting to load model from {model_path}")
         
+        # Try to load existing model first
         if os.path.exists(model_path):
-            logger.info("Loading existing model...")
-            model = load_model(model_path)
-            logger.info("Model loaded successfully")
-        else:
-            logger.info("Model file not found, creating new model")
-            X, y = create_training_data()
-            model = create_model()
-            # Minimal training for faster initialization
-            model.fit(X, y, epochs=5, batch_size=4, verbose=1)
-            
-            # Ensure directory exists
-            os.makedirs(os.path.dirname(model_path), exist_ok=True)
-            model.save(model_path)
-            logger.info(f"Created and saved new model to {model_path}")
+            try:
+                model = load_model(model_path)
+                logger.info("Successfully loaded existing model")
+                return True
+            except Exception as e:
+                logger.warning(f"Failed to load existing model: {str(e)}")
+                logger.info("Creating new model...")
+        
+        # If loading fails or model doesn't exist, create new one
+        logger.info("Creating new model with improved training...")
+        X, y = create_training_data()
+        model = create_model()
+        
+        # Train with early stopping to prevent overfitting
+        early_stopping = tf.keras.callbacks.EarlyStopping(
+            monitor='val_accuracy',
+            patience=5,
+            restore_best_weights=True
+        )
+        
+        history = model.fit(
+            X, y,
+            epochs=50,
+            batch_size=16,
+            validation_split=0.2,
+            callbacks=[early_stopping],
+            verbose=1,
+            shuffle=True
+        )
+        
+        # Save the model
+        model.save(model_path)
+        logger.info(f"Created and saved model to {model_path}")
+        
+        # Log training results
+        val_accuracy = history.history['val_accuracy'][-1]
+        logger.info(f"Final validation accuracy: {val_accuracy:.4f}")
         
         return True
     except Exception as e:
@@ -181,78 +260,269 @@ def initialize_model():
 def index():
     return render_template('index.html')
 
+def calibrate_confidence(prediction, sensor_data):
+    """Calibrate the confidence score based on multiple factors"""
+    try:
+        # Get the raw confidence from the model
+        raw_confidence = float(prediction[np.argmax(prediction)])
+        
+        # Calculate pattern match score
+        pattern_score = calculate_pattern_match_score(sensor_data, ACTIVITIES[np.argmax(prediction)])
+        
+        # Calculate data quality score
+        data_quality = min(1.0, len(sensor_data) / 10.0)  # Normalize to 1.0 for 10+ samples
+        
+        # Calculate signal quality score
+        signal_quality = calculate_signal_quality(sensor_data)
+        
+        # Combine scores with weights
+        calibrated_confidence = (
+            0.4 * raw_confidence +  # Model prediction
+            0.3 * pattern_score +   # Pattern matching
+            0.2 * data_quality +    # Data quality
+            0.1 * signal_quality    # Signal quality
+        )
+        
+        return min(1.0, calibrated_confidence)  # Cap at 1.0
+    except Exception as e:
+        logger.error(f"Error in confidence calibration: {str(e)}")
+        return raw_confidence  # Fallback to raw confidence
+
+def calculate_pattern_match_score(sensor_data, activity):
+    """Calculate how well the sensor data matches the expected pattern for an activity"""
+    try:
+        # Calculate basic statistics
+        avg_vertical = np.mean(np.abs(sensor_data[:, 1]))
+        avg_horizontal = np.mean(np.abs(sensor_data[:, 0]))
+        avg_gravity = np.mean(sensor_data[:, 2])
+        
+        # Define expected patterns for each activity
+        patterns = {
+            'Walking': {
+                'y_range': (5.0, 12.0),    # Moderate vertical movement
+                'z_range': (-3.0, -0.5),   # Forward tilt
+                'x_range': (0.0, 2.0)      # Side-to-side movement
+            },
+            'Running': {
+                'y_range': (12.0, 18.0),   # High vertical movement
+                'z_range': (-4.0, -2.0),   # Strong forward tilt
+                'x_range': (0.0, 3.0)      # More side-to-side movement
+            },
+            'Sitting': {
+                'y_range': (0.5, 2.0),     # Low vertical movement
+                'z_range': (9.5, 9.8),     # Upward orientation
+                'x_range': (0.0, 0.5)      # Minimal side movement
+            },
+            'Standing': {
+                'y_range': (0.0, 0.3),     # Minimal movement
+                'z_range': (9.7, 9.9),     # Straight upward
+                'x_range': (0.0, 0.3)      # Minimal side movement
+            },
+            'Laying': {
+                'y_range': (9.7, 9.9),     # Sideways gravity
+                'z_range': (-0.2, 0.2),    # Minimal vertical
+                'x_range': (0.0, 0.3)      # Minimal side movement
+            }
+        }
+        
+        pattern = patterns[activity]
+        
+        # Calculate match scores for each axis
+        y_score = 1.0 - min(1.0, abs(avg_vertical - np.mean(pattern['y_range'])) / 5.0)
+        z_score = 1.0 - min(1.0, abs(avg_gravity - np.mean(pattern['z_range'])) / 5.0)
+        x_score = 1.0 - min(1.0, abs(avg_horizontal - np.mean(pattern['x_range'])) / 2.0)
+        
+        # Combine scores with weights
+        pattern_score = 0.4 * y_score + 0.4 * z_score + 0.2 * x_score
+        
+        return pattern_score
+    except Exception as e:
+        logger.error(f"Error in pattern match calculation: {str(e)}")
+        return 0.5  # Return neutral score on error
+
+def calculate_signal_quality(sensor_data):
+    """Calculate the quality of the sensor signal"""
+    try:
+        # Calculate signal-to-noise ratio
+        signal_power = np.mean(np.square(sensor_data))
+        noise_power = np.var(sensor_data)
+        snr = signal_power / (noise_power + 1e-6)  # Add small constant to avoid division by zero
+        
+        # Normalize SNR to 0-1 range
+        snr_score = min(1.0, snr / 10.0)
+        
+        # Calculate signal stability
+        stability = 1.0 - min(1.0, np.std(sensor_data) / 5.0)
+        
+        # Combine scores
+        signal_quality = 0.6 * snr_score + 0.4 * stability
+        
+        return signal_quality
+    except Exception as e:
+        logger.error(f"Error in signal quality calculation: {str(e)}")
+        return 0.5  # Return neutral score on error
+
 @app.route('/predict', methods=['POST'])
 def predict():
-    """Handle prediction requests with optimized processing"""
     try:
-        # Get and validate input data
         data = request.get_json()
         logger.info(f"Received request data: {data}")
-
-        if not data or "sensor_data" not in data:
+        
+        if not data or 'sensor_data' not in data:
             logger.error("Invalid request: No sensor data provided")
-            return jsonify({"error": "Missing sensor_data"}), 400
+            return jsonify({'error': 'No sensor data provided'}), 400
+
+        sensor_data = np.array(data['sensor_data'])
+        logger.info(f"Converted sensor data to numpy array with shape: {sensor_data.shape}")
+        
+        if len(sensor_data) == 0:
+            logger.error("Empty sensor data array")
+            return jsonify({'error': 'Empty sensor data'}), 400
 
         # Initialize model if not already initialized
         global model
         if model is None:
             logger.info("Model not initialized, initializing now...")
             if not initialize_model():
-                return jsonify({"error": "Failed to initialize model"}), 500
+                logger.error("Failed to initialize model")
+                return jsonify({'error': 'Failed to initialize model'}), 500
 
-        sensor_data = np.array(data["sensor_data"])
-        logger.info(f"Received sensor data shape: {sensor_data.shape}")
-
-        # Validate input shape
-        if sensor_data.ndim != 2 or sensor_data.shape[1] != 3:
-            logger.error(f"Invalid sensor data shape: {sensor_data.shape}")
-            return jsonify({"error": "Expected 2D array with shape (timesteps, 3)"}), 400
-
-        # Reshape for RNN (batch_size, timesteps, features)
-        input_data = sensor_data.reshape((1, sensor_data.shape[0], 3))
-        logger.info(f"Input reshaped to: {input_data.shape}")
-
-        # Make prediction with timing
-        start_time = time.time()
         try:
-            prediction = model.predict(input_data, verbose=0)[0]
-            prediction_time = time.time() - start_time
-            logger.info(f"Prediction completed in {prediction_time:.2f} seconds")
-            logger.info(f"Raw prediction: {prediction}")
-
-            # Clean up memory after prediction
-            cleanup_memory()
-
-            # Process results
-            result = {
-                'prediction': ACTIVITIES[np.argmax(prediction)],
-                'confidence': float(np.max(prediction)),
-                'probabilities': {
-                    activity: float(prob) 
-                    for activity, prob in zip(ACTIVITIES, prediction)
-                },
-                'prediction_time': prediction_time
+            # Calculate basic metrics
+            avg_acceleration = {
+                'x': float(np.mean(sensor_data[:, 0])),
+                'y': float(np.mean(sensor_data[:, 1])),
+                'z': float(np.mean(sensor_data[:, 2]))
             }
             
-            logger.info(f"Final prediction: {result['prediction']} with confidence {result['confidence']}")
-            return jsonify(result)
+            peak_acceleration = {
+                'x': float(np.max(np.abs(sensor_data[:, 0]))),
+                'y': float(np.max(np.abs(sensor_data[:, 1]))),
+                'z': float(np.max(np.abs(sensor_data[:, 2])))
+            }
+            
+            variability = {
+                'x': float(np.std(sensor_data[:, 0])),
+                'y': float(np.std(sensor_data[:, 1])),
+                'z': float(np.std(sensor_data[:, 2]))
+            }
+
+            # Calculate movement metrics
+            total_movement = np.sqrt(np.sum(sensor_data**2, axis=1))
+            movement_intensity = float(np.mean(total_movement))
+            vertical_movement = float(np.mean(np.abs(sensor_data[:, 1])))
+            horizontal_movement = float(np.mean(np.sqrt(sensor_data[:, 0]**2 + sensor_data[:, 2]**2)))
+            gravity_alignment = float(np.mean(np.abs(sensor_data[:, 2] - 9.81)))
+
+            # Calculate pattern match scores for each activity
+            pattern_scores = {
+                'Walking': calculate_pattern_match_score(sensor_data, 'Walking'),
+                'Running': calculate_pattern_match_score(sensor_data, 'Running'),
+                'Sitting': calculate_pattern_match_score(sensor_data, 'Sitting'),
+                'Standing': calculate_pattern_match_score(sensor_data, 'Standing'),
+                'Laying': calculate_pattern_match_score(sensor_data, 'Laying')
+            }
+
+            # Get model prediction
+            logger.info("Making model prediction...")
+            prediction = model.predict(sensor_data.reshape(1, -1, 3))
+            predicted_activity = ACTIVITIES[np.argmax(prediction)]
+            logger.info(f"Predicted activity: {predicted_activity}")
+            
+            # Calculate confidence and probabilities
+            raw_scores = {}
+            for activity in ACTIVITIES:
+                model_score = prediction[0][ACTIVITIES.index(activity)]
+                pattern_score = pattern_scores[activity]
+                raw_scores[activity] = (model_score * 0.7) + (pattern_score * 0.3)
+            
+            # Normalize scores to get probabilities
+            total_score = sum(raw_scores.values())
+            probabilities = {activity: score/total_score for activity, score in raw_scores.items()}
+            
+            # Calculate overall confidence
+            confidence = probabilities[predicted_activity]
+            
+            # Get pattern match confidence level
+            pattern_confidence = 'High' if pattern_scores[predicted_activity] > 0.8 else \
+                               'Medium' if pattern_scores[predicted_activity] > 0.6 else 'Low'
+
+            # Calculate signal quality based on confidence (as percentage)
+            confidence_percentage = confidence * 100
+            signal_quality = 'Good' if confidence_percentage >= 80 else \
+                           'Fair' if confidence_percentage >= 60 else 'Poor'
+
+            # Calculate data reliability based on pattern match (as percentage)
+            pattern_match_percentage = pattern_scores[predicted_activity] * 100
+            data_reliability = 'High' if pattern_match_percentage >= 90 else \
+                             'Medium' if pattern_match_percentage >= 70 else 'Low'
+
+            response = {
+                'prediction': predicted_activity,
+                'confidence': float(confidence),
+                'probabilities': {k: float(v) for k, v in probabilities.items()},
+                'metrics': {
+                    'pattern_scores': {k: float(v) for k, v in pattern_scores.items()},
+                    'acceleration': {
+                        'average': {
+                            'x': f"{avg_acceleration['x']:.2f}",
+                            'y': f"{avg_acceleration['y']:.2f}",
+                            'z': f"{avg_acceleration['z']:.2f}"
+                        },
+                        'peak': {
+                            'x': f"{peak_acceleration['x']:.2f}",
+                            'y': f"{peak_acceleration['y']:.2f}",
+                            'z': f"{peak_acceleration['z']:.2f}"
+                        },
+                        'variability': {
+                            'x': f"{variability['x']:.2f}",
+                            'y': f"{variability['y']:.2f}",
+                            'z': f"{variability['z']:.2f}"
+                        }
+                    },
+                    'movement_metrics': {
+                        'intensity': f"{movement_intensity:.2f}",
+                        'vertical_movement': f"{vertical_movement:.2f}",
+                        'horizontal_movement': f"{horizontal_movement:.2f}",
+                        'gravity_alignment': f"{gravity_alignment:.2f}"
+                    }
+                },
+                'activity_info': {
+                    'pattern_match': {
+                        'confidence': pattern_confidence,
+                        'description': describe_pattern_match(sensor_data, predicted_activity)
+                    }
+                }
+            }
+
+            logger.info(f"Successfully generated response: {response}")
+            return jsonify(response)
 
         except Exception as e:
-            logger.error(f"Error during prediction: {str(e)}")
+            logger.error(f"Error during prediction processing: {str(e)}")
             logger.error(traceback.format_exc())
-            cleanup_memory()
-            return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
-
+            return jsonify({'error': f'Error processing prediction: {str(e)}'}), 500
+            
     except Exception as e:
-        logger.error(f"Error processing request: {str(e)}")
+        logger.error(f"Error handling request: {str(e)}")
         logger.error(traceback.format_exc())
-        cleanup_memory()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({'error': str(e)}), 500
+
+def describe_pattern_match(sensor_data, activity):
+    """Generate a description of how well the sensor data matches the activity pattern"""
+    pattern_score = calculate_pattern_match_score(sensor_data, activity)
+    
+    if pattern_score > 0.8:
+        return f"The sensor data strongly matches the expected pattern for {activity.lower()}."
+    elif pattern_score > 0.6:
+        return f"The sensor data shows a good match with the expected pattern for {activity.lower()}."
+    elif pattern_score > 0.4:
+        return f"The sensor data shows some characteristics of {activity.lower()}, but with some variations."
+    else:
+        return f"The sensor data shows significant differences from the expected pattern for {activity.lower()}."
 
 if __name__ == '__main__':
-    # Initialize model before starting the app
-    if initialize_model():
-        port = int(os.environ.get('PORT', 5000))
-        app.run(host='0.0.0.0', port=port, debug=False)
-    else:
-        logger.error("Failed to initialize model")
+    app.debug = True  # Enable debug mode
+    app.jinja_env.auto_reload = True  # Enable template auto-reload
+    app.config['TEMPLATES_AUTO_RELOAD'] = True  # Force template reloading
+    app.run(host='0.0.0.0', port=5000)
