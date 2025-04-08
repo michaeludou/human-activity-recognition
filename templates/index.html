@@ -148,34 +148,23 @@
                             <div class="card-body">
                                 <h4 class="card-title">Prediction Result</h4>
                                 <div class="row">
-                                    <div class="col-md-6">
+                                    <div class="col-md-12">
                                         <p>Activity: <span id="predicted-activity" class="fw-bold"></span></p>
                                         <p>Confidence: <span id="confidence" class="fw-bold"></span></p>
-                                        <p>Pattern Score: <span id="pattern-score" class="fw-bold"></span></p>
                                         <p>Number of Samples: <span id="num-samples" class="fw-bold"></span></p>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <h5>Sensor Metrics</h5>
-                                        <div id="sensor-metrics">
-                                            <p>Movement Intensity: <span id="movement-intensity"></span></p>
-                                            <p>Total Variation: <span id="total-variation"></span></p>
-                                            <p>Gravity Vector: <span id="gravity-vector"></span></p>
-                                            <p>Standard Deviation: <span id="std-deviation"></span></p>
-                                            <p>Range: <span id="range"></span></p>
-                                        </div>
+                                        <p>Prediction Time: <span id="prediction-time" class="fw-bold"></span></p>
                                     </div>
                                 </div>
                                 
                                 <div class="mt-4">
-                                    <h5>Confidence Breakdown</h5>
+                                    <h5>Activity Probabilities</h5>
                                     <div id="confidence-breakdown" class="table-responsive">
                                         <table class="table table-sm">
                                             <thead>
                                                 <tr>
                                                     <th>Activity</th>
-                                                    <th>Model Confidence</th>
-                                                    <th>Pattern Score</th>
-                                                    <th>Final Confidence</th>
+                                                    <th>Probability</th>
+                                                    <th>Final Score</th>
                                                 </tr>
                                             </thead>
                                             <tbody id="confidence-table-body">
@@ -253,42 +242,42 @@
     </div>
 
     <script>
-        // Sample data for different activities
+        // Sample data for different activities with movement intensity
         const sampleData = {
             walking: [
-                [0.69, 10.8, -2.03],
-                [6.85, 7.44, -0.5],
-                [0.93, 5.63, -0.5],
-                [1.25, 8.45, -1.2],
-                [0.75, 9.12, -1.8]
+                {x: 0.69, y: 10.8, z: -2.03, movement_intensity: 5.2},
+                {x: 6.85, y: 7.44, z: -0.5, movement_intensity: 4.8},
+                {x: 0.93, y: 5.63, z: -0.5, movement_intensity: 4.5},
+                {x: 1.25, y: 8.45, z: -1.2, movement_intensity: 5.0},
+                {x: 0.75, y: 9.12, z: -1.8, movement_intensity: 4.9}
             ],
             running: [
-                [2.15, 15.2, -3.45],
-                [8.75, 12.3, -2.1],
-                [3.25, 14.8, -2.8],
-                [4.12, 13.5, -3.2],
-                [2.85, 15.0, -3.0]
+                {x: 2.15, y: 15.2, z: -3.45, movement_intensity: 8.5},
+                {x: 8.75, y: 12.3, z: -2.1, movement_intensity: 8.2},
+                {x: 3.25, y: 14.8, z: -2.8, movement_intensity: 8.7},
+                {x: 4.12, y: 13.5, z: -3.2, movement_intensity: 8.4},
+                {x: 2.85, y: 15.0, z: -3.0, movement_intensity: 8.6}
             ],
             sitting: [
-                [0.12, 0.15, 9.81],
-                [0.10, 0.12, 9.80],
-                [0.11, 0.14, 9.82],
-                [0.13, 0.16, 9.81],
-                [0.12, 0.15, 9.80]
+                {x: 0.12, y: 1.5, z: 9.65, movement_intensity: 0.5},
+                {x: 0.10, y: 1.4, z: 9.64, movement_intensity: 0.4},
+                {x: 0.11, y: 1.45, z: 9.63, movement_intensity: 0.4},
+                {x: 0.13, y: 1.48, z: 9.65, movement_intensity: 0.5},
+                {x: 0.12, y: 1.47, z: 9.64, movement_intensity: 0.4}
             ],
             standing: [
-                [0.15, 0.20, 9.81],
-                [0.14, 0.18, 9.82],
-                [0.16, 0.19, 9.81],
-                [0.15, 0.21, 9.80],
-                [0.14, 0.20, 9.81]
+                {x: 0.15, y: 0.20, z: 9.81, movement_intensity: 0.2},
+                {x: 0.14, y: 0.18, z: 9.82, movement_intensity: 0.2},
+                {x: 0.16, y: 0.19, z: 9.81, movement_intensity: 0.2},
+                {x: 0.15, y: 0.21, z: 9.80, movement_intensity: 0.2},
+                {x: 0.14, y: 0.20, z: 9.81, movement_intensity: 0.2}
             ],
             laying: [
-                [0.05, 0.08, 9.81],
-                [0.06, 0.07, 9.82],
-                [0.05, 0.09, 9.81],
-                [0.06, 0.08, 9.80],
-                [0.05, 0.07, 9.81]
+                {x: 0.05, y: 9.81, z: 0.08, movement_intensity: 0.1},
+                {x: 0.06, y: 9.82, z: 0.07, movement_intensity: 0.1},
+                {x: 0.05, y: 9.81, z: 0.09, movement_intensity: 0.1},
+                {x: 0.06, y: 9.80, z: 0.08, movement_intensity: 0.1},
+                {x: 0.05, y: 9.81, z: 0.07, movement_intensity: 0.1}
             ]
         };
 
@@ -302,15 +291,19 @@
                 document.getElementById('sensor-inputs').appendChild(newRow);
                 
                 const inputs = newRow.querySelectorAll('input');
-                inputs[0].value = point[0];
-                inputs[1].value = point[1];
-                inputs[2].value = point[2];
+                inputs[0].value = point.x;
+                inputs[1].value = point.y;
+                inputs[2].value = point.z;
+                
+                // Set movement intensity as a data attribute
+                newRow.dataset.movementIntensity = point.movement_intensity || 0;
             });
         }
 
         function createSensorInputRow() {
             const div = document.createElement('div');
             div.className = 'sensor-input row';
+            div.dataset.movementIntensity = '0'; // Default movement intensity
             div.innerHTML = `
                 <div class="col">
                     <input type="number" class="form-control x-axis" placeholder="X-axis" step="0.01" required>
@@ -356,26 +349,6 @@
             return isValid;
         }
 
-        function formatMetric(value) {
-            return value.map(v => v.toFixed(2)).join(', ');
-        }
-
-        function updateConfidenceTable(confidences) {
-            const tbody = document.getElementById('confidence-table-body');
-            tbody.innerHTML = '';
-            
-            Object.entries(confidences).forEach(([activity, scores]) => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${activity}</td>
-                    <td>${(scores.model_confidence * 100).toFixed(2)}%</td>
-                    <td>${(scores.pattern_score * 100).toFixed(2)}%</td>
-                    <td>${(scores.final_confidence * 100).toFixed(2)}%</td>
-                `;
-                tbody.appendChild(row);
-            });
-        }
-
         function predictActivity() {
             if (!validateInputs()) {
                 alert('Please fill in all sensor values');
@@ -400,66 +373,60 @@
                 return;
             }
 
-            // Hide previous result while loading
-            document.querySelector('.result-card').style.display = 'none';
+            // Show loading state
+            const predictButton = document.querySelector('button.btn-primary');
+            const originalText = predictButton.textContent;
+            predictButton.textContent = 'Predicting...';
+            predictButton.disabled = true;
 
-            // Get the current host URL
-            const apiUrl = window.location.origin + '/predict';
-
-            fetch(apiUrl, {
+            fetch('/predict', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    sensor_data: sensorData
-                })
+                body: JSON.stringify({ sensor_data: sensorData })
             })
             .then(response => {
-                console.log('Response status:', response.status);
                 if (!response.ok) {
-                    if (response.status === 502) {
-                        throw new Error('Server is temporarily unavailable. Please try again in a few moments.');
-                    } else if (response.status === 404) {
-                        throw new Error('API endpoint not found. Please check the server configuration.');
-                    } else if (response.status === 500) {
-                        throw new Error('Server error occurred. Please try again later.');
-                    }
                     return response.json().then(err => {
-                        throw new Error(err.error || `Server error (${response.status}): An error occurred while making the prediction`);
+                        throw new Error(err.error || 'Server error');
                     });
                 }
                 return response.json();
             })
             .then(data => {
-                console.log('Received data:', data);
-                if (data.error) {
-                    throw new Error(data.error);
-                }
-
-                // Update main prediction
-                document.getElementById('predicted-activity').textContent = data.activity;
-                document.getElementById('confidence').textContent = (data.confidence * 100).toFixed(2) + '%';
-                document.getElementById('pattern-score').textContent = (data.pattern_score * 100).toFixed(2) + '%';
-                document.getElementById('num-samples').textContent = data.num_samples;
-
-                // Update metrics
-                document.getElementById('movement-intensity').textContent = formatMetric(data.metrics.movement_intensity);
-                document.getElementById('total-variation').textContent = formatMetric(data.metrics.total_variation);
-                document.getElementById('gravity-vector').textContent = formatMetric(data.metrics.gravity_vector);
-                document.getElementById('std-deviation').textContent = formatMetric(data.metrics.std_deviation);
-                document.getElementById('range').textContent = formatMetric(data.metrics.range);
-
-                // Update confidence breakdown
-                updateConfidenceTable(data.all_confidences);
-
-                // Show result card
+                console.log('Prediction response:', data);
+                
+                // Update the result card
                 document.querySelector('.result-card').style.display = 'block';
+                document.getElementById('predicted-activity').textContent = data.prediction;
+                document.getElementById('confidence').textContent = `${(data.confidence * 100).toFixed(2)}%`;
+                document.getElementById('num-samples').textContent = sensorData.length;
+                document.getElementById('prediction-time').textContent = `${data.prediction_time.toFixed(2)}s`;
+
+                // Update probabilities
+                const tbody = document.getElementById('confidence-table-body');
+                tbody.innerHTML = '';
+                
+                Object.entries(data.probabilities).forEach(([activity, probability]) => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${activity}</td>
+                        <td>${(probability * 100).toFixed(2)}%</td>
+                        <td>${(probability * 100).toFixed(2)}%</td>
+                    `;
+                    tbody.appendChild(row);
+                });
             })
             .catch(error => {
-                console.error('Error details:', error);
-                alert(error.message || 'An error occurred while making the prediction. Please try again.');
+                console.error('Error:', error);
+                alert(error.message || 'Error predicting activity');
                 document.querySelector('.result-card').style.display = 'none';
+            })
+            .finally(() => {
+                // Reset button state
+                predictButton.textContent = originalText;
+                predictButton.disabled = false;
             });
         }
     </script>
