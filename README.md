@@ -2,13 +2,11 @@
 
 A real-time human activity recognition system using Deep Learning (RNN-LSTM) with an interactive web interface. The application uses accelerometer data to predict and analyze human activities such as walking, running, sitting, standing, and laying.
 
-## Demo
+## Youtube Video Demo
 
 Watch a demonstration of the application in action:
 
-https://github.com/michaeludou/human-activity-recognition/blob/main/assets/demo_HAR.mp4
-
-![Demo Preview](assets/demo.gif)
+https://youtu.be/VAujHg1Vhl8
 
 ## Deep Learning Model Architecture
 
