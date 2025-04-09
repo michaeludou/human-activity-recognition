@@ -1,8 +1,8 @@
-# Human Activity Recognition Web Application
+# A deep learning based HAR Web Application
 
 A real-time human activity recognition system using Deep Learning (RNN-LSTM) with an interactive web interface. The application uses accelerometer data to predict and analyze human activities such as walking, running, sitting, standing, and laying.
 
-## Youtube Video Demo
+## Youtube Video Web App Demo
 
 Watch a demonstration of the application in action:
 
