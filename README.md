@@ -7,17 +7,25 @@ A real-time human activity recognition system using Deep Learning (RNN-LSTM) wit
 Watch a demonstration of the application in action:
 
 https://youtu.be/VAujHg1Vhl8
-## 🖼️ Preview Gallery
+## 🖼️ Interactive Preview Gallery
 
-<h3 align="center">Live Web App Screenshots</h3>
+<h3 align="center">Click to Enlarge</h3>
 
 <p align="center">
-  <img src="assets/1.png" width="45%" alt="Dashboard Screenshot"/>
-  <img src="assets/2.png" width="45%" alt="Activity Prediction"/>
+  <a href="assets/1.png" target="_blank">
+    <img src="assets/1.png" width="45%" alt="Dashboard Screenshot"/>
+  </a>
+  <a href="assets/2.png" target="_blank">
+    <img src="assets/2.png" width="45%" alt="Activity Prediction"/>
+  </a>
 </p>
 <p align="center">
-  <img src="assets/3.png" width="45%" alt="Analysis Results"/>
-  <img src="assets/4.png" width="45%" alt="Activity Probabilities"/>
+  <a href="assets/3.png" target="_blank">
+    <img src="assets/3.png" width="45%" alt="Analysis Results"/>
+  </a>
+  <a href="assets/4.png" target="_blank">
+    <img src="assets/4.png" width="45%" alt="Activity Probabilities"/>
+  </a>
 </p>
 
 ## Deep Learning Model Architecture
