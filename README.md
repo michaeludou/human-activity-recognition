@@ -7,9 +7,7 @@ A real-time human activity recognition system using Deep Learning (RNN-LSTM) wit
 Watch a demonstration of the application in action:
 
 https://youtu.be/VAujHg1Vhl8
-## 🖼️ Interactive Preview Gallery
-
-<h3 align="center">Click to Enlarge</h3>
+##   Preview Gallery
 
 <p align="center">
   <a href="assets/1.png" target="_blank">
